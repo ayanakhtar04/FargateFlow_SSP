@@ -1,148 +1,145 @@
 import React, { useState } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { 
-  BookOpen, 
-  Calendar, 
-  CheckSquare, 
-  Target, 
-  BarChart3, 
-  User, 
-  Menu, 
-  X,
-  LogOut,
-  Settings
+  Grid3X3, 
+  Mail, 
+  Send, 
+  Clock, 
+  Headphones, 
+  Settings, 
+  Plus,
+  User
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Layout = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
 
   const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
-    { name: 'Subjects', href: '/subjects', icon: BookOpen },
-    { name: 'Planner', href: '/planner', icon: Calendar },
-    { name: 'Todos', href: '/todos', icon: CheckSquare },
-    { name: 'Goals', href: '/goals', icon: Target },
-    { name: 'Progress', href: '/progress', icon: BarChart3 },
+    { name: 'Dashboard', href: '/dashboard', icon: Grid3X3 },
+    { name: 'Subjects', href: '/subjects', icon: Mail },
+    { name: 'Planner', href: '/planner', icon: Send },
+    { name: 'Todos', href: '/todos', icon: Clock },
+    { name: 'Goals', href: '/goals', icon: Headphones },
+    { name: 'Progress', href: '/progress', icon: Settings },
     { name: 'Profile', href: '/profile', icon: User },
   ];
 
-  const handleLogout = () => {
-    logout();
-  };
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
-        <div 
-          className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${
-        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-      }`}>
-        <div className="flex flex-col h-full">
-          {/* Logo */}
-          <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
-            <div className="flex items-center">
-              <BookOpen className="w-8 h-8 text-primary-600" />
-              <span className="ml-2 text-xl font-bold text-gray-900">Study Planner</span>
-            </div>
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="lg:hidden p-1 rounded-md text-gray-400 hover:text-gray-600"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 px-4 py-6 space-y-2">
-            {navigation.map((item) => {
-              const Icon = item.icon;
-              const isActive = location.pathname === item.href;
-              
-              return (
-                <NavLink
-                  key={item.name}
-                  to={item.href}
-                  className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${
-                    isActive
-                      ? 'bg-primary-100 text-primary-700 border-r-2 border-primary-600'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                  }`}
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <Icon className="w-5 h-5 mr-3" />
-                  {item.name}
-                </NavLink>
-              );
-            })}
-          </nav>
-
-          {/* User section */}
-          <div className="border-t border-gray-200 p-4">
-            <div className="flex items-center mb-4">
-              <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                <User className="w-4 h-4 text-primary-600" />
-              </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-900">{user?.name}</p>
-                <p className="text-xs text-gray-500">{user?.email}</p>
-              </div>
-            </div>
-            
-            <div className="space-y-1">
-              <button
-                onClick={handleLogout}
-                className="flex items-center w-full px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-md transition-colors duration-200"
+    <div className="min-h-screen bg-[#121212] relative">
+      {/* Decorative background gradient */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,#1f1f1f,transparent_60%),radial-gradient(circle_at_80%_60%,#1a1a1a,transparent_55%)]" />
+      <div className="relative flex flex-1 overflow-hidden pt-8 pl-8 pr-8 pb-6">
+  {/* Sidebar */}
+  <div className={`fixed left-8 top-8 z-50 w-24 h-[calc(100vh-4rem)] rounded-3xl bg-[#181818]/85 backdrop-blur-xl shadow-[0_8px_32px_-4px_rgba(0,0,0,0.6)] border border-[#2a2a2a] ring-1 ring-black/40 flex flex-col transform transition-transform duration-300 ease-in-out ${
+    sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+  }`}>
+          <div className="flex flex-col h-full items-center py-1 justify-between">
+            {/* Logo */}
+            <NavLink to="/dashboard" onClick={() => setSidebarOpen(false)} title="Home" className="mt-2 mb-2">
+              <img
+                src="/logo.png"
+                alt="FargateFlow Logo"
+                className="w-12 h-12 object-contain drop-shadow-md"
+                loading="lazy"
+              />
+            </NavLink>
+            {/* Navigation (excluding Profile) */}
+            <nav className="flex-1 flex flex-col items-center gap-8 justify-center">
+              {navigation.filter(n => n.name !== 'Profile').map((item) => {
+                const Icon = item.icon;
+                const isActive = location.pathname === item.href;
+                return (
+                  <NavLink
+                    key={item.name}
+                    to={item.href}
+                    className={`w-12 h-12 rounded-2xl flex items-center justify-center text-base font-semibold shadow group transition-colors duration-300 ease-in-out ring-1 ${isActive ? 'bg-[#67FA3E] text-[#121212] ring-[#67FA3E]' : 'text-[#67FA3E] ring-transparent hover:bg-[#232323] hover:text-white hover:ring-[#67FA3E]'}`}
+                    onClick={() => setSidebarOpen(false)}
+                    title={item.name}
+                  >
+                    <Icon className="w-7 h-7" />
+                  </NavLink>
+                );
+              })}
+            </nav>
+            {/* Bottom Profile avatar */}
+            <div className="mb-4">
+              <NavLink
+                to="/profile"
+                className={({ isActive }) => `w-14 h-14 rounded-2xl flex items-center justify-center shadow ring-1 transition-colors duration-300 ease-in-out overflow-hidden ${isActive ? 'bg-[#67FA3E] text-[#121212] ring-[#67FA3E]' : 'text-[#67FA3E] ring-transparent hover:bg-[#232323] hover:text-white hover:ring-[#67FA3E]'}`}
+                title="Profile"
+                onClick={() => setSidebarOpen(false)}
               >
-                <LogOut className="w-4 h-4 mr-3" />
-                Logout
-              </button>
+                {user?.profile_image ? (
+                  <img
+                    src={`/${user.profile_image}`}
+                    alt="Profile"
+                    className="w-full h-full object-cover rounded-2xl"
+                    loading="lazy"
+                  />
+                ) : (
+                  <User className="w-8 h-8" />
+                )}
+              </NavLink>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Main content */}
-      <div className="lg:pl-64">
-        {/* Top header */}
-        <header className="bg-white shadow-sm border-b border-gray-200">
-          <div className="flex items-center justify-between h-16 px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center">
+        {/* Main content */}
+  <div className="flex-1 flex flex-col overflow-auto lg:ml-32">
+          {/* Header */}
+          <header className="sticky top-8 mx-auto w-full max-w-[1400px] h-20 rounded-3xl bg-[#181818]/80 backdrop-blur-xl border border-[#2a2a2a] ring-1 ring-black/40 shadow-[0_8px_32px_-4px_rgba(0,0,0,0.55)] flex items-center px-10 justify-between transition-colors">
+            <div className="flex items-center gap-6 flex-shrink-0">
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                className="lg:hidden p-2 rounded-xl text-[#67FA3E] hover:text-white hover:bg-[#232323] border border-[#232323]"
               >
-                <Menu className="w-6 h-6" />
+                <Grid3X3 className="w-6 h-6" />
               </button>
-              <h1 className="ml-2 lg:ml-0 text-lg font-semibold text-gray-900">
+              <h1 className="text-2xl font-bold leading-tight" style={{color: '#67FA3E'}}>
                 {navigation.find(item => item.href === location.pathname)?.name || 'Dashboard'}
               </h1>
             </div>
-            
-            <div className="flex items-center space-x-4">
-              <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md">
-                <Settings className="w-5 h-5" />
-              </button>
+            <div className="flex-1 hidden md:flex justify-center px-4">
+              <span className="text-[14px] tracking-wide font-medium uppercase text-center select-none" style={{color:'#86ffad', letterSpacing:'0.12em'}}>
+                From Pipeline to Planner: Smart Flow, Smarter Study.
+              </span>
             </div>
-          </div>
-        </header>
-
-        {/* Page content */}
-        <main className="p-4 sm:p-6 lg:p-8">
-          <Outlet />
-        </main>
+            <div className="flex items-center space-x-6 flex-shrink-0">
+              <NavLink
+                to="/profile"
+                className={({ isActive }) => `relative w-12 h-12 rounded-full border flex items-center justify-center overflow-hidden transition-all duration-200 ${isActive ? 'border-[#67FA3E] ring-1 ring-[#67FA3E]/40 scale-105' : 'border-[#232323] hover:border-[#67FA3E] hover:scale-105'} bg-[#232323]`}
+                title="Profile"
+              >
+                {user?.profile_image ? (
+                  <img
+                    src={`/${user.profile_image}`}
+                    alt="Profile"
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <User className="w-6 h-6 text-[#67FA3E]" />
+                )}
+              </NavLink>
+            </div>
+          </header>
+          {/* Page content */}
+          <main className="px-2 pt-8 pb-4 flex-1 overflow-auto fade-in max-w-[1400px] mx-auto w-full">
+            <Outlet />
+          </main>
+        </div>
       </div>
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden fade-in"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
     </div>
   );
 };
 
-export default Layout; 
+export default Layout;

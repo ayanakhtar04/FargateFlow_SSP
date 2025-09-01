@@ -62,53 +62,57 @@ router.get('/', auth, validatePagination, async (req, res) => {
   }
 });
 
-// Create new progress entry
+// Create / upsert progress entry (aggregates hours for same subject+date)
 router.post('/', auth, validateProgress, async (req, res) => {
   try {
     const { subject_id, date, hours_studied, notes } = req.body;
 
-    // Verify subject exists and belongs to user (if provided)
-    if (subject_id) {
-      const subject = await get(
-        'SELECT id FROM subjects WHERE id = ? AND user_id = ?',
-        [subject_id, req.user.id]
-      );
-
-      if (!subject) {
-        return res.status(400).json({ error: 'Invalid subject' });
-      }
+    // Verify subject exists and belongs to user
+    const subject = await get(
+      'SELECT id, name FROM subjects WHERE id = ? AND user_id = ?',
+      [subject_id, req.user.id]
+    );
+    if (!subject) {
+      return res.status(400).json({ error: 'Invalid subject' });
     }
 
-    // Check if progress entry already exists for this date and subject
-    const existingProgress = await get(
-      'SELECT id FROM progress WHERE user_id = ? AND subject_id = ? AND date = ?',
+    // Fetch existing entry
+    const existing = await get(
+      'SELECT id, hours_studied FROM progress WHERE user_id = ? AND subject_id = ? AND date = ?',
       [req.user.id, subject_id, date]
     );
 
-    if (existingProgress) {
-      return res.status(400).json({ error: 'Progress entry already exists for this date and subject' });
+    let progressId;
+    if (existing) {
+      // Aggregate hours
+      const newTotal = (existing.hours_studied || 0) + parseFloat(hours_studied);
+      await execute(
+        'UPDATE progress SET hours_studied = ?, notes = COALESCE(?, notes), updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [newTotal, notes || null, existing.id]
+      );
+      progressId = existing.id;
+      logger.info(`Progress aggregated: +${hours_studied}h (total ${newTotal}h) for subject ${subject.name} by user ${req.user.id}`);
+    } else {
+      const result = await execute(
+        'INSERT INTO progress (user_id, subject_id, date, hours_studied, notes) VALUES (?, ?, ?, ?, ?)',
+        [req.user.id, subject_id, date, hours_studied, notes]
+      );
+      progressId = result.id;
+      logger.info(`Progress entry created: ${hours_studied}h for subject ${subject.name} by user ${req.user.id}`);
     }
 
-    // Create progress entry
-    const result = await execute(
-      'INSERT INTO progress (user_id, subject_id, date, hours_studied, notes) VALUES (?, ?, ?, ?, ?)',
-      [req.user.id, subject_id, date, hours_studied, notes]
-    );
-
-    // Get the created progress entry
     const progress = await get(
       `SELECT p.*, s.name as subject_name, s.color as subject_color
        FROM progress p
        LEFT JOIN subjects s ON p.subject_id = s.id
        WHERE p.id = ?`,
-      [result.id]
+      [progressId]
     );
 
-    logger.info(`Progress entry created: ${hours_studied}h for subject ${progress.subject_name} by user ${req.user.id}`);
-
-    res.status(201).json({
-      message: 'Progress entry created successfully',
-      progress
+    res.status(existing ? 200 : 201).json({
+      message: existing ? 'Progress updated successfully (aggregated)' : 'Progress entry created successfully',
+      progress,
+      aggregated: !!existing
     });
   } catch (error) {
     logger.error('Create progress error:', error);
@@ -297,6 +301,62 @@ router.get('/analytics/overview', auth, async (req, res) => {
     });
   } catch (error) {
     logger.error('Get progress analytics error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Auto-log today's planner slots into progress (idempotent)
+router.post('/auto/log-today', auth, async (req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0,10); // YYYY-MM-DD
+    // Get planner slots for today (match JS getDay with 0=Sunday) and subject info
+    const day = new Date().getDay();
+    const slots = await query(
+      `SELECT ps.id, ps.subject_id, ps.start_time, ps.end_time, ps.duration_minutes, s.name as subject_name
+       FROM planner_slots ps
+       JOIN subjects s ON ps.subject_id = s.id
+       WHERE ps.user_id = ? AND ps.day_of_week = ?`,
+      [req.user.id, day]
+    );
+
+    if (!slots.length) {
+      return res.json({ message: 'No planner slots for today', created: 0 });
+    }
+
+    let created = 0;
+    for (const slot of slots) {
+      // Determine hours
+      let minutes = slot.duration_minutes;
+      if (!minutes && slot.start_time && slot.end_time) {
+        const start = new Date(`2000-01-01T${slot.start_time}`);
+        const end = new Date(`2000-01-01T${slot.end_time}`);
+        minutes = Math.round((end - start)/60000);
+      }
+      const hours = (minutes || 0) / 60;
+      if (hours <= 0) continue;
+
+      // Upsert using same aggregation logic
+      const existing = await get(
+        'SELECT id, hours_studied FROM progress WHERE user_id = ? AND subject_id = ? AND date = ?',
+        [req.user.id, slot.subject_id, today]
+      );
+      if (existing) {
+        await execute(
+          'UPDATE progress SET hours_studied = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+          [existing.hours_studied + hours, existing.id]
+        );
+      } else {
+        await execute(
+          'INSERT INTO progress (user_id, subject_id, date, hours_studied) VALUES (?, ?, ?, ?, ?)',
+          [req.user.id, slot.subject_id, today, hours, null]
+        );
+        created++;
+      }
+    }
+
+    res.json({ message: 'Auto log complete', created, date: today });
+  } catch (error) {
+    logger.error('Auto log today error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

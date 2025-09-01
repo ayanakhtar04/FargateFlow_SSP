@@ -1,4 +1,7 @@
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { validateRegistration, validateLogin } = require('../middleware/validation');
@@ -7,6 +10,31 @@ const { query, execute, get } = require('../config/database');
 const logger = require('../utils/logger');
 
 const router = express.Router();
+
+// Multer setup for profile images
+const uploadDir = path.join(__dirname, '..', 'uploads', 'profiles');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `user-${req.user.id}-${Date.now()}${ext}`);
+  }
+});
+
+const fileFilter = (req, file, cb) => {
+  if (/^image\/(png|jpe?g|webp)$/.test(file.mimetype)) cb(null, true);
+  else cb(new Error('Only PNG, JPG, and WEBP images allowed'));
+};
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+  fileFilter
+});
 
 // Register new user
 router.post('/register', validateRegistration, async (req, res) => {
@@ -35,7 +63,7 @@ router.post('/register', validateRegistration, async (req, res) => {
 
     // Get the created user
     const user = await get(
-      'SELECT id, name, email, created_at FROM users WHERE id = ?',
+      'SELECT id, name, email, created_at, profile_image FROM users WHERE id = ?',
       [result.id]
     );
 
@@ -54,6 +82,7 @@ router.post('/register', validateRegistration, async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
+        profile_image: user.profile_image,
         created_at: user.created_at
       },
       token
@@ -72,7 +101,7 @@ router.post('/login', validateLogin, async (req, res) => {
 
     // Find user by email
     const user = await get(
-      'SELECT id, name, email, password, created_at FROM users WHERE email = ?',
+      'SELECT id, name, email, password, created_at, profile_image FROM users WHERE email = ?',
       [email]
     );
 
@@ -101,6 +130,7 @@ router.post('/login', validateLogin, async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
+        profile_image: user.profile_image,
         created_at: user.created_at
       },
       token
@@ -116,7 +146,7 @@ router.post('/login', validateLogin, async (req, res) => {
 router.get('/me', auth, async (req, res) => {
   try {
     const user = await get(
-      'SELECT id, name, email, created_at FROM users WHERE id = ?',
+      'SELECT id, name, email, created_at, profile_image FROM users WHERE id = ?',
       [req.user.id]
     );
 
@@ -156,7 +186,7 @@ router.put('/me', auth, async (req, res) => {
 
     // Get updated user
     const user = await get(
-      'SELECT id, name, email, created_at FROM users WHERE id = ?',
+      'SELECT id, name, email, created_at, profile_image FROM users WHERE id = ?',
       [req.user.id]
     );
 
@@ -231,4 +261,42 @@ router.delete('/me', auth, async (req, res) => {
   }
 });
 
-module.exports = router; 
+// Upload profile image
+router.post('/me/profile-image', auth, upload.single('image'), async (req, res) => {
+  try {
+    // Delete previous image if exists
+    const existing = await get('SELECT profile_image FROM users WHERE id = ?', [req.user.id]);
+    if (existing?.profile_image) {
+      const oldPath = path.join(__dirname, '..', existing.profile_image);
+      if (fs.existsSync(oldPath)) fs.unlink(oldPath, () => {});
+    }
+
+  let relativePath = path.join('uploads', 'profiles', path.basename(req.file.path));
+  relativePath = relativePath.replace(/\\/g, '/');
+    await execute('UPDATE users SET profile_image = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [relativePath, req.user.id]);
+    const updated = await get('SELECT id, name, email, created_at, profile_image FROM users WHERE id = ?', [req.user.id]);
+    res.json({ message: 'Profile image updated', user: updated });
+  } catch (error) {
+    logger.error('Profile image upload error:', error);
+    res.status(500).json({ error: 'Failed to upload image' });
+  }
+});
+
+// Delete profile image
+router.delete('/me/profile-image', auth, async (req, res) => {
+  try {
+    const existing = await get('SELECT profile_image FROM users WHERE id = ?', [req.user.id]);
+    if (existing?.profile_image) {
+      const imgPath = path.join(__dirname, '..', existing.profile_image);
+      if (fs.existsSync(imgPath)) fs.unlink(imgPath, () => {});
+      await execute('UPDATE users SET profile_image = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [req.user.id]);
+    }
+    const updated = await get('SELECT id, name, email, created_at, profile_image FROM users WHERE id = ?', [req.user.id]);
+    res.json({ message: 'Profile image removed', user: updated });
+  } catch (error) {
+    logger.error('Profile image delete error:', error);
+    res.status(500).json({ error: 'Failed to delete image' });
+  }
+});
+
+module.exports = router;

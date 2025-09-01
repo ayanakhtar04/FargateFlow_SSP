@@ -149,12 +149,12 @@ const Todos = () => {
   }
 
   return (
-    <div className="space-y-6">
+  <div className="space-y-8 pt-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Daily Tasks</h1>
-          <p className="text-gray-600">Manage your daily study tasks and to-dos</p>
+          <h1 className="text-2xl font-bold text-[#67FA3E]">Daily Tasks</h1>
+          <p className="text-[#67FA3E] opacity-80">Manage your daily study tasks and to-dos</p>
         </div>
         <button
           onClick={openModal}
@@ -169,20 +169,20 @@ const Todos = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="card">
           <div className="card-body text-center">
-            <div className="text-2xl font-bold text-gray-900">{totalCount}</div>
-            <div className="text-gray-600">Total Tasks</div>
+            <div className="text-2xl font-bold text-[#67FA3E]">{totalCount}</div>
+            <div className="text-[#67FA3E] opacity-80">Total Tasks</div>
           </div>
         </div>
         <div className="card">
           <div className="card-body text-center">
-            <div className="text-2xl font-bold text-green-600">{completedCount}</div>
-            <div className="text-gray-600">Completed</div>
+            <div className="text-2xl font-bold text-[#67FA3E]">{completedCount}</div>
+            <div className="text-[#67FA3E] opacity-80">Completed</div>
           </div>
         </div>
         <div className="card">
           <div className="card-body text-center">
-            <div className="text-2xl font-bold text-blue-600">{totalCount - completedCount}</div>
-            <div className="text-gray-600">Pending</div>
+            <div className="text-2xl font-bold text-[#67FA3E]">{totalCount - completedCount}</div>
+            <div className="text-[#67FA3E] opacity-80">Pending</div>
           </div>
         </div>
       </div>
@@ -217,32 +217,34 @@ const Todos = () => {
 
       {/* Todos List */}
       {filteredTodos.length === 0 ? (
-        <div className="text-center py-12">
-          <CheckCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            {filter === 'all' ? 'No tasks yet' : filter === 'completed' ? 'No completed tasks' : 'No pending tasks'}
-          </h3>
-          <p className="text-gray-600 mb-4">
-            {filter === 'all' ? 'Create your first task to start organizing your studies' : 'Great job! Keep up the good work!'}
-          </p>
-          {filter === 'all' && (
-            <button onClick={openModal} className="btn btn-primary">
-              Create Your First Task
-            </button>
-          )}
+        <div className="card bg-[#181818] border border-[#232323]">
+          <div className="card-body text-center">
+            <CheckCircle className="w-16 h-16 text-[#67FA3E] mx-auto mb-4 opacity-80" />
+            <h3 className="text-xl font-semibold text-[#67FA3E] mb-2">
+              {filter === 'all' ? 'No tasks yet' : filter === 'completed' ? 'No completed tasks' : 'No pending tasks'}
+            </h3>
+            <p className="text-[#67FA3E] opacity-80 mb-4">
+              {filter === 'all' ? 'Create your first task to start organizing your studies' : 'Great job! Keep up the good work!'}
+            </p>
+            {filter === 'all' && (
+              <button onClick={openModal} className="btn btn-primary">
+                Create Your First Task
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <div className="space-y-3">
           {filteredTodos.map((todo) => (
-            <div key={todo.id} className="card hover:shadow-md transition-shadow duration-200">
+            <div key={todo.id} className="card hover:shadow-md transition-shadow duration-200 bg-[#181818] border border-[#232323]">
               <div className="card-body">
                 <div className="flex items-start gap-3">
                   <button
                     onClick={() => handleToggleComplete(todo.id, todo.is_completed)}
-                    className="mt-1 text-gray-400 hover:text-green-600 transition-colors"
+                    className="mt-1 text-[#67FA3E] hover:scale-110 transition-transform"
                   >
                     {todo.is_completed ? (
-                      <CheckCircle className="w-5 h-5 text-green-600" />
+                      <CheckCircle className="w-5 h-5 text-[#67FA3E]" />
                     ) : (
                       <Circle className="w-5 h-5" />
                     )}
@@ -251,11 +253,11 @@ const Todos = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
-                        <h3 className={`text-lg font-medium ${todo.is_completed ? 'line-through text-gray-500' : 'text-gray-900'}`}>
+                        <h3 className={`text-lg font-medium ${todo.is_completed ? 'line-through text-[#67FA3E] opacity-70' : 'text-[#67FA3E]'}`}> 
                           {todo.title}
                         </h3>
                         {todo.description && (
-                          <p className={`text-sm mt-1 ${todo.is_completed ? 'text-gray-400' : 'text-gray-600'}`}>
+                          <p className={`text-sm mt-1 ${todo.is_completed ? 'text-[#67FA3E] opacity-60' : 'text-[#67FA3E] opacity-80'}`}>
                             {todo.description}
                           </p>
                         )}
@@ -267,12 +269,12 @@ const Todos = () => {
                                 className="w-3 h-3 rounded-full"
                                 style={{ backgroundColor: todo.subject_color }}
                               ></div>
-                              <span className="text-sm text-gray-600">{todo.subject_name}</span>
+                              <span className="text-sm text-[#67FA3E] opacity-80">{todo.subject_name}</span>
                             </div>
                           )}
                           
                           {todo.due_date && (
-                            <div className="flex items-center gap-1 text-sm text-gray-600">
+                            <div className="flex items-center gap-1 text-sm text-[#67FA3E] opacity-80">
                               <Calendar className="w-4 h-4" />
                               {new Date(todo.due_date).toLocaleDateString()}
                             </div>
@@ -287,13 +289,13 @@ const Todos = () => {
                       <div className="flex items-center gap-2 ml-4">
                         <button
                           onClick={() => handleEdit(todo)}
-                          className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                          className="p-1 text-[#67FA3E] hover:bg-[#232323] rounded transition-colors"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(todo.id)}
-                          className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                          className="p-1 text-[#67FA3E] hover:bg-red-600/10 hover:text-red-500 rounded transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -309,48 +311,48 @@ const Todos = () => {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-[#181818] border border-[#232323] rounded-xl p-6 w-full max-w-md mx-4 shadow-xl">
+            <h2 className="text-xl font-semibold text-[#67FA3E] mb-4">
               {editingTodo ? 'Edit Task' : 'Add New Task'}
             </h2>
             
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-[#67FA3E] mb-1">
                   Task Title *
                 </label>
                 <input
                   type="text"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="input w-full"
+                  className="input w-full focus:ring-[#67FA3E] focus:border-[#67FA3E]"
                   placeholder="e.g., Complete math homework"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-[#67FA3E] mb-1">
                   Description
                 </label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="input w-full"
+                  className="input w-full focus:ring-[#67FA3E] focus:border-[#67FA3E]"
                   rows="3"
                   placeholder="Optional description of the task"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-[#67FA3E] mb-1">
                   Subject
                 </label>
                 <select
                   value={formData.subject_id}
                   onChange={(e) => setFormData({ ...formData, subject_id: e.target.value })}
-                  className="input w-full"
+                  className="input w-full focus:ring-[#67FA3E] focus:border-[#67FA3E]"
                 >
                   <option value="">No subject</option>
                   {subjects.map((subject) => (
@@ -362,25 +364,25 @@ const Todos = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-[#67FA3E] mb-1">
                   Due Date
                 </label>
                 <input
                   type="date"
                   value={formData.due_date}
                   onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                  className="input w-full"
+                  className="input w-full focus:ring-[#67FA3E] focus:border-[#67FA3E]"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-[#67FA3E] mb-1">
                   Priority
                 </label>
                 <select
                   value={formData.priority}
                   onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                  className="input w-full"
+                  className="input w-full focus:ring-[#67FA3E] focus:border-[#67FA3E]"
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
@@ -392,7 +394,7 @@ const Todos = () => {
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="btn btn-secondary flex-1"
+                  className="btn btn-secondary flex-1 hover:border-[#67FA3E]"
                 >
                   Cancel
                 </button>

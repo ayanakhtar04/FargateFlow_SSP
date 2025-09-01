@@ -56,6 +56,8 @@ export const AuthProvider = ({ children }) => {
       setUser(userData);
       setToken(authToken);
       localStorage.setItem('token', authToken);
+  // Immediately set header to prevent first protected fetch race condition
+  axios.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
       
       toast.success('Login successful!');
       return { success: true };
@@ -79,6 +81,8 @@ export const AuthProvider = ({ children }) => {
       setUser(userData);
       setToken(authToken);
       localStorage.setItem('token', authToken);
+  // Immediately set header to avoid race before useEffect runs
+  axios.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
       
       toast.success('Registration successful!');
       return { success: true };
@@ -100,11 +104,41 @@ export const AuthProvider = ({ children }) => {
   const updateProfile = async (profileData) => {
     try {
       const response = await axios.put('/api/auth/me', profileData);
-      setUser(response.data.user);
+  setUser(response.data.user);
       toast.success('Profile updated successfully!');
       return { success: true };
     } catch (error) {
       const message = error.response?.data?.error || 'Profile update failed';
+      toast.error(message);
+      return { success: false, error: message };
+    }
+  };
+
+  const uploadProfileImage = async (file) => {
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      const response = await axios.post('/api/auth/me/profile-image', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setUser(response.data.user);
+      toast.success('Profile image updated');
+      return { success: true };
+    } catch (error) {
+      const message = error.response?.data?.error || 'Image upload failed';
+      toast.error(message);
+      return { success: false, error: message };
+    }
+  };
+
+  const removeProfileImage = async () => {
+    try {
+      const response = await axios.delete('/api/auth/me/profile-image');
+      setUser(response.data.user);
+      toast.success('Profile image removed');
+      return { success: true };
+    } catch (error) {
+      const message = error.response?.data?.error || 'Failed to remove image';
       toast.error(message);
       return { success: false, error: message };
     }
@@ -150,7 +184,9 @@ export const AuthProvider = ({ children }) => {
     logout,
     updateProfile,
     changePassword,
-    deleteAccount
+  deleteAccount,
+  uploadProfileImage,
+  removeProfileImage
   };
 
   return (

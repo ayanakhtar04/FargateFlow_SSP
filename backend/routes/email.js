@@ -306,7 +306,7 @@ function generateDailyReminderEmail({ userName, plannerSlots, todos, overdueTodo
           <p>Stay focused and keep up the great work! 🚀</p>
         </div>
         <div class="footer">
-          <p>This email was sent by Smart Study Planner</p>
+          <p>This email was sent by FargateFlow – From Pipeline to Planner: Smart Flow, Smarter Study.</p>
           <p>You can manage your email preferences in your account settings.</p>
         </div>
       </div>

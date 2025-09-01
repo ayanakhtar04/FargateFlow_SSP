@@ -1,7 +1,7 @@
 {
   "name": "smart-study-planner-frontend",
   "version": "1.0.0",
-  "description": "Frontend for Smart Study Planner application",
+  "description": "Frontend for FargateFlow application",
   "private": true,
   "dependencies": {
     "@testing-library/jest-dom": "^5.17.0",
@@ -52,5 +52,5 @@
     "autoprefixer": "^10.4.16",
     "postcss": "^8.4.32"
   },
-  "proxy": "http://localhost:5001"
+  "proxy": "http://localhost:5000"
 } 

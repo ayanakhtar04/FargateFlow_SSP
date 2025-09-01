@@ -105,8 +105,8 @@ const validateTodo = [
   handleValidationErrors
 ];
 
-// Goal validation
-const validateGoal = [
+// Goal validation (create)
+const validateGoalCreate = [
   body('title')
     .trim()
     .isLength({ min: 1, max: 200 })
@@ -115,10 +115,10 @@ const validateGoal = [
     .optional()
     .isLength({ max: 1000 })
     .withMessage('Description must be less than 1000 characters'),
-  body('target_date')
+  body('due_date')
     .optional()
     .isISO8601()
-    .withMessage('Target date must be a valid ISO 8601 date'),
+    .withMessage('Due date must be a valid ISO 8601 date'),
   body('subject_id')
     .isInt({ min: 1 })
     .withMessage('Subject ID must be a positive integer'),
@@ -126,6 +126,36 @@ const validateGoal = [
     .optional()
     .isFloat({ min: 0 })
     .withMessage('Target hours must be a positive number'),
+  handleValidationErrors
+];
+
+// Goal validation (update / partial)
+const validateGoalUpdate = [
+  body('title')
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 200 })
+    .withMessage('Goal title must be between 1 and 200 characters'),
+  body('description')
+    .optional()
+    .isLength({ max: 1000 })
+    .withMessage('Description must be less than 1000 characters'),
+  body('due_date')
+    .optional()
+    .isISO8601()
+    .withMessage('Due date must be a valid ISO 8601 date'),
+  body('subject_id')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Subject ID must be a positive integer'),
+  body('target_hours')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Target hours must be a positive number'),
+  body('is_completed')
+    .optional()
+    .isBoolean()
+    .withMessage('is_completed must be boolean'),
   handleValidationErrors
 ];
 
@@ -174,7 +204,8 @@ module.exports = {
   validateSubject,
   validatePlannerSlot,
   validateTodo,
-  validateGoal,
+  validateGoalCreate,
+  validateGoalUpdate,
   validateProgress,
   validateId,
   validatePagination,

@@ -1,5 +1,5 @@
 const express = require('express');
-const { validateGoal, validateId, validatePagination } = require('../middleware/validation');
+const { validateGoalCreate, validateGoalUpdate, validateId, validatePagination } = require('../middleware/validation');
 const { auth } = require('../middleware/auth');
 const { query, execute, get } = require('../config/database');
 const logger = require('../utils/logger');
@@ -58,7 +58,7 @@ router.get('/', auth, validatePagination, async (req, res) => {
 });
 
 // Create new goal
-router.post('/', auth, validateGoal, async (req, res) => {
+router.post('/', auth, validateGoalCreate, async (req, res) => {
   try {
     const { title, description, subject_id, target_hours, due_date } = req.body;
 
@@ -126,10 +126,10 @@ router.get('/:id', auth, validateId, async (req, res) => {
 });
 
 // Update goal
-router.put('/:id', auth, validateId, validateGoal, async (req, res) => {
+router.put('/:id', auth, validateId, validateGoalUpdate, async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, subject_id, target_hours, due_date } = req.body;
+  const { title, description, subject_id, target_hours, due_date, is_completed } = req.body;
 
     // Check if goal exists and belongs to user
     const existingGoal = await get(
@@ -153,11 +153,24 @@ router.put('/:id', auth, validateId, validateGoal, async (req, res) => {
       }
     }
 
-    // Update goal
-    await execute(
-      'UPDATE goals SET title = ?, description = ?, subject_id = ?, target_hours = ?, due_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [title, description, subject_id, target_hours, due_date, id]
-    );
+    // Build dynamic update set
+    const fields = [];
+    const params = [];
+    if (title !== undefined) { fields.push('title = ?'); params.push(title); }
+    if (description !== undefined) { fields.push('description = ?'); params.push(description); }
+    if (subject_id !== undefined) { fields.push('subject_id = ?'); params.push(subject_id || null); }
+    if (target_hours !== undefined) { fields.push('target_hours = ?'); params.push(target_hours); }
+    if (due_date !== undefined) { fields.push('due_date = ?'); params.push(due_date || null); }
+    if (is_completed !== undefined) { fields.push('is_completed = ?'); params.push(is_completed ? 1 : 0); }
+
+    if (fields.length === 0) {
+      return res.status(400).json({ error: 'No valid fields provided for update' });
+    }
+
+    fields.push('updated_at = CURRENT_TIMESTAMP');
+    const sql = `UPDATE goals SET ${fields.join(', ')} WHERE id = ?`;
+    params.push(id);
+    await execute(sql, params);
 
     // Get updated goal
     const goal = await get(

@@ -2,8 +2,8 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const logger = require('../utils/logger');
 
-// Create database file in the project root
-const dbPath = path.join(__dirname, '..', '..', 'database.sqlite');
+// Create database file in the backend directory
+const dbPath = path.join(__dirname, '..', 'database.sqlite');
 
 // Create database connection
 const db = new sqlite3.Database(dbPath, (err) => {

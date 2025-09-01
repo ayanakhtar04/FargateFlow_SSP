@@ -12,10 +12,16 @@ const createTables = async () => {
         name TEXT NOT NULL,
         email TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
+        profile_image TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Attempt to add profile_image column if it doesn't exist (SQLite workaround)
+    await execute(`
+      ALTER TABLE users ADD COLUMN profile_image TEXT
+    `).catch(() => {});
 
     // Create subjects table
     await execute(`
@@ -62,12 +68,18 @@ const createTables = async () => {
         end_time TEXT NOT NULL,
         title TEXT,
         description TEXT,
+    duration_minutes INTEGER, -- added later, ensure column exists
+    is_active BOOLEAN DEFAULT 1, -- soft enable/disable slots
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
         FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE SET NULL
       )
     `);
+
+  // Attempt to add missing columns if table pre-existed without them
+  await execute(`ALTER TABLE planner_slots ADD COLUMN duration_minutes INTEGER`).catch(() => {});
+  await execute(`ALTER TABLE planner_slots ADD COLUMN is_active BOOLEAN DEFAULT 1`).catch(() => {});
 
     // Create todos table
     await execute(`

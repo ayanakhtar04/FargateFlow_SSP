@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
+const path = require('path');
 require('dotenv').config();
 
 const logger = require('./utils/logger');
@@ -39,6 +40,9 @@ app.use(cors({
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Static serving for uploads
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Request logging
 app.use((req, res, next) => {

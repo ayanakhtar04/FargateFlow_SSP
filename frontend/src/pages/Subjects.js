@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, BookOpen } from 'lucide-react';
+import { Plus, Edit, Trash2 } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
@@ -109,12 +109,12 @@ const Subjects = () => {
   }
 
   return (
-    <div className="space-y-6">
+  <div className="space-y-8 pt-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Subjects</h1>
-          <p className="text-gray-600">Manage your study subjects and topics</p>
+          <h1 className="text-2xl font-bold text-[#67FA3E]">Subjects</h1>
+          <p className="text-[#67FA3E] opacity-80">Manage your study subjects and topics</p>
         </div>
         <button
           onClick={openModal}
@@ -127,18 +127,20 @@ const Subjects = () => {
 
       {/* Subjects Grid */}
       {subjects.length === 0 ? (
-        <div className="text-center py-12">
-          <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No subjects yet</h3>
-          <p className="text-gray-600 mb-4">Create your first subject to start organizing your studies</p>
-          <button onClick={openModal} className="btn btn-primary">
-            Create Your First Subject
-          </button>
+        <div className="card bg-[#181818] border border-[#232323]">
+          <div className="card-body text-center">
+            <img src="/logo.png" alt="Logo" className="w-16 h-16 mx-auto mb-4 opacity-80" />
+            <h3 className="text-xl font-semibold text-[#67FA3E] mb-2">No subjects yet</h3>
+            <p className="text-[#67FA3E] opacity-80 mb-6">Create your first subject to start organizing your studies</p>
+            <button onClick={openModal} className="btn btn-primary">
+              Create Your First Subject
+            </button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {subjects.map((subject) => (
-            <div key={subject.id} className="card hover:shadow-md transition-shadow duration-200">
+            <div key={subject.id} className="card hover:shadow-md transition-shadow duration-200 bg-[#181818] border border-[#232323]">
               <div className="card-body">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -146,18 +148,18 @@ const Subjects = () => {
                       className="w-4 h-4 rounded-full"
                       style={{ backgroundColor: subject.color }}
                     ></div>
-                    <h3 className="text-lg font-semibold text-gray-900">{subject.name}</h3>
+                    <h3 className="text-lg font-semibold text-[#67FA3E]">{subject.name}</h3>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleEdit(subject)}
-                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                      className="p-1 text-[#67FA3E] hover:bg-[#232323] rounded transition-colors"
                     >
                       <Edit className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDelete(subject.id)}
-                      className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                      className="p-1 text-[#67FA3E] hover:bg-red-600/10 hover:text-red-500 rounded transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -165,21 +167,21 @@ const Subjects = () => {
                 </div>
                 
                 {subject.description && (
-                  <p className="text-gray-600 text-sm mb-4">{subject.description}</p>
+                  <p className="text-sm mb-4 text-[#67FA3E] opacity-80">{subject.description}</p>
                 )}
 
                 <div className="grid grid-cols-3 gap-4 text-sm">
                   <div className="text-center">
-                    <div className="font-semibold text-gray-900">{subject.total_todos || 0}</div>
-                    <div className="text-gray-500">Tasks</div>
+                    <div className="font-semibold text-[#67FA3E]">{subject.total_todos || 0}</div>
+                    <div className="text-[#67FA3E] opacity-80">Tasks</div>
                   </div>
                   <div className="text-center">
-                    <div className="font-semibold text-gray-900">{subject.total_goals || 0}</div>
-                    <div className="text-gray-500">Goals</div>
+                    <div className="font-semibold text-[#67FA3E]">{subject.total_goals || 0}</div>
+                    <div className="text-[#67FA3E] opacity-80">Goals</div>
                   </div>
                   <div className="text-center">
-                    <div className="font-semibold text-gray-900">{subject.total_hours || 0}h</div>
-                    <div className="text-gray-500">Studied</div>
+                    <div className="font-semibold text-[#67FA3E]">{subject.total_hours || 0}h</div>
+                    <div className="text-[#67FA3E] opacity-80">Studied</div>
                   </div>
                 </div>
               </div>
@@ -190,42 +192,42 @@ const Subjects = () => {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-[#181818] border border-[#232323] rounded-xl p-6 w-full max-w-md mx-4 shadow-xl">
+            <h2 className="text-xl font-semibold text-[#67FA3E] mb-4">
               {editingSubject ? 'Edit Subject' : 'Add New Subject'}
             </h2>
             
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-[#67FA3E] mb-1">
                   Subject Name *
                 </label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="input w-full"
+                  className="input w-full focus:ring-[#67FA3E] focus:border-[#67FA3E]"
                   placeholder="e.g., Mathematics, Physics, History"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-[#67FA3E] mb-1">
                   Description
                 </label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="input w-full"
+                  className="input w-full focus:ring-[#67FA3E] focus:border-[#67FA3E]"
                   rows="3"
                   placeholder="Optional description of the subject"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-[#67FA3E] mb-1">
                   Color
                 </label>
                 <div className="grid grid-cols-5 gap-2">
@@ -234,8 +236,8 @@ const Subjects = () => {
                       key={color}
                       type="button"
                       onClick={() => setFormData({ ...formData, color })}
-                      className={`w-8 h-8 rounded-full border-2 transition-all ${
-                        formData.color === color ? 'border-gray-900 scale-110' : 'border-gray-300 hover:border-gray-400'
+                      className={`w-8 h-8 rounded-full border-2 transition-all shadow-sm ${
+                        formData.color === color ? 'border-[#67FA3E] ring-2 ring-[#67FA3E] scale-110' : 'border-[#232323] hover:border-[#67FA3E]'
                       }`}
                       style={{ backgroundColor: color }}
                     />
@@ -247,7 +249,7 @@ const Subjects = () => {
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="btn btn-secondary flex-1"
+                  className="btn btn-secondary flex-1 hover:border-[#67FA3E]"
                 >
                   Cancel
                 </button>

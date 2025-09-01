@@ -1,4 +1,6 @@
-# Smart Study Planner
+# FargateFlow
+
+From Pipeline to Planner: Smart Flow, Smarter Study.
 
 A full-stack web application for intelligent study planning and progress tracking.
 
@@ -36,7 +38,7 @@ A full-stack web application for intelligent study planning and progress trackin
 ## Project Structure
 
 ```
-smart-study-planner/
+fargateflow/
 ├── frontend/                 # React.js frontend application
 ├── backend/                  # Node.js Express.js backend
 ├── infrastructure/           # AWS deployment configurations
@@ -58,7 +60,7 @@ smart-study-planner/
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
-   cd smart-study-planner
+   cd fargateflow
    ```
 
 2. **Set up environment variables**
