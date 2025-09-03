@@ -50,8 +50,8 @@ const Planner = () => {
 
   const handleAddSlot = async (slotData) => {
     try {
-      const response = await axios.post('/api/planner-slots', slotData);
-      setPlannerSlots(prev => [...prev, response.data.planner_slot]);
+      await axios.post('/api/planner-slots', slotData);
+      await fetchData();
       setShowAddModal(false);
       toast.success('Study slot added successfully!');
     } catch (error) {
@@ -61,10 +61,8 @@ const Planner = () => {
 
   const handleUpdateSlot = async (id, slotData) => {
     try {
-      const response = await axios.put(`/api/planner-slots/${id}`, slotData);
-      setPlannerSlots(prev => prev.map(slot => 
-        slot.id === id ? response.data.planner_slot : slot
-      ));
+      await axios.put(`/api/planner-slots/${id}`, slotData);
+      await fetchData();
       setEditingSlot(null);
       toast.success('Study slot updated successfully!');
     } catch (error) {
@@ -75,7 +73,7 @@ const Planner = () => {
   const handleDeleteSlot = async (id) => {
     try {
       await axios.delete(`/api/planner-slots/${id}`);
-      setPlannerSlots(prev => prev.filter(slot => slot.id !== id));
+      await fetchData();
       toast.success('Study slot deleted successfully!');
     } catch (error) {
       toast.error('Failed to delete study slot');
@@ -84,7 +82,7 @@ const Planner = () => {
 
   const getSlotsForDayAndTime = (dayIndex, time) => {
     return plannerSlots.filter(slot => 
-      slot.day_of_week === dayIndex && slot.start_time === time
+      slot && typeof slot.day_of_week !== 'undefined' && slot.day_of_week === dayIndex && slot.start_time === time
     );
   };
 

@@ -12,22 +12,26 @@ router.get('/', auth, validatePagination, async (req, res) => {
     const { page = 1, limit = 10, subject_id, start_date, end_date } = req.query;
     const offset = (page - 1) * limit;
 
-    let whereClause = 'WHERE p.user_id = ?';
+    let whereClause = 'WHERE p.user_id = $1';
     let params = [req.user.id];
+    let paramIndex = 2;
 
     if (subject_id) {
-      whereClause += ' AND p.subject_id = ?';
+      whereClause += ` AND p.subject_id = $${paramIndex}`;
       params.push(subject_id);
+      paramIndex++;
     }
 
     if (start_date) {
-      whereClause += ' AND p.date >= ?';
+      whereClause += ` AND p.date >= $${paramIndex}`;
       params.push(start_date);
+      paramIndex++;
     }
 
     if (end_date) {
-      whereClause += ' AND p.date <= ?';
+      whereClause += ` AND p.date <= $${paramIndex}`;
       params.push(end_date);
+      paramIndex++;
     }
 
     // Get progress entries with subject info
@@ -37,7 +41,7 @@ router.get('/', auth, validatePagination, async (req, res) => {
        LEFT JOIN subjects s ON p.subject_id = s.id
        ${whereClause}
        ORDER BY p.date DESC
-       LIMIT ? OFFSET ?`,
+       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
       [...params, parseInt(limit), offset]
     );
 
@@ -69,7 +73,7 @@ router.post('/', auth, validateProgress, async (req, res) => {
 
     // Verify subject exists and belongs to user
     const subject = await get(
-      'SELECT id, name FROM subjects WHERE id = ? AND user_id = ?',
+      'SELECT id, name FROM subjects WHERE id = $1 AND user_id = $2',
       [subject_id, req.user.id]
     );
     if (!subject) {
@@ -78,7 +82,7 @@ router.post('/', auth, validateProgress, async (req, res) => {
 
     // Fetch existing entry
     const existing = await get(
-      'SELECT id, hours_studied FROM progress WHERE user_id = ? AND subject_id = ? AND date = ?',
+      'SELECT id, hours_studied FROM progress WHERE user_id = $1 AND subject_id = $2 AND date = $3',
       [req.user.id, subject_id, date]
     );
 
@@ -87,14 +91,14 @@ router.post('/', auth, validateProgress, async (req, res) => {
       // Aggregate hours
       const newTotal = (existing.hours_studied || 0) + parseFloat(hours_studied);
       await execute(
-        'UPDATE progress SET hours_studied = ?, notes = COALESCE(?, notes), updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        'UPDATE progress SET hours_studied = $1, notes = COALESCE($2, notes), updated_at = CURRENT_TIMESTAMP WHERE id = $3',
         [newTotal, notes || null, existing.id]
       );
       progressId = existing.id;
       logger.info(`Progress aggregated: +${hours_studied}h (total ${newTotal}h) for subject ${subject.name} by user ${req.user.id}`);
     } else {
       const result = await execute(
-        'INSERT INTO progress (user_id, subject_id, date, hours_studied, notes) VALUES (?, ?, ?, ?, ?)',
+        'INSERT INTO progress (user_id, subject_id, date, hours_studied, notes) VALUES ($1, $2, $3, $4, $5)',
         [req.user.id, subject_id, date, hours_studied, notes]
       );
       progressId = result.id;
@@ -105,7 +109,7 @@ router.post('/', auth, validateProgress, async (req, res) => {
       `SELECT p.*, s.name as subject_name, s.color as subject_color
        FROM progress p
        LEFT JOIN subjects s ON p.subject_id = s.id
-       WHERE p.id = ?`,
+       WHERE p.id = $1`,
       [progressId]
     );
 
@@ -129,7 +133,7 @@ router.get('/:id', auth, validateId, async (req, res) => {
       `SELECT p.*, s.name as subject_name, s.color as subject_color
        FROM progress p
        LEFT JOIN subjects s ON p.subject_id = s.id
-       WHERE p.id = ? AND p.user_id = ?`,
+       WHERE p.id = $1 AND p.user_id = $2`,
       [id, req.user.id]
     );
 
@@ -152,7 +156,7 @@ router.put('/:id', auth, validateId, validateProgress, async (req, res) => {
 
     // Check if progress entry exists and belongs to user
     const existingProgress = await get(
-      'SELECT id FROM progress WHERE id = ? AND user_id = ?',
+      'SELECT id FROM progress WHERE id = $1 AND user_id = $2',
       [id, req.user.id]
     );
 
@@ -163,7 +167,7 @@ router.put('/:id', auth, validateId, validateProgress, async (req, res) => {
     // Verify subject exists and belongs to user (if provided)
     if (subject_id) {
       const subject = await get(
-        'SELECT id FROM subjects WHERE id = ? AND user_id = ?',
+        'SELECT id FROM subjects WHERE id = $1 AND user_id = $2',
         [subject_id, req.user.id]
       );
 
@@ -175,7 +179,7 @@ router.put('/:id', auth, validateId, validateProgress, async (req, res) => {
     // Check if new date/subject combination conflicts with existing entry
     if (date && subject_id) {
       const conflict = await get(
-        'SELECT id FROM progress WHERE user_id = ? AND subject_id = ? AND date = ? AND id != ?',
+        'SELECT id FROM progress WHERE user_id = $1 AND subject_id = $2 AND date = $3 AND id != $4',
         [req.user.id, subject_id, date, id]
       );
 
@@ -186,7 +190,7 @@ router.put('/:id', auth, validateId, validateProgress, async (req, res) => {
 
     // Update progress entry
     await execute(
-      'UPDATE progress SET subject_id = ?, date = ?, hours_studied = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      'UPDATE progress SET subject_id = $1, date = $2, hours_studied = $3, notes = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5',
       [subject_id, date, hours_studied, notes, id]
     );
 
@@ -195,7 +199,7 @@ router.put('/:id', auth, validateId, validateProgress, async (req, res) => {
       `SELECT p.*, s.name as subject_name, s.color as subject_color
        FROM progress p
        LEFT JOIN subjects s ON p.subject_id = s.id
-       WHERE p.id = ?`,
+       WHERE p.id = $1`,
       [id]
     );
 
@@ -218,7 +222,7 @@ router.delete('/:id', auth, validateId, async (req, res) => {
 
     // Check if progress entry exists and belongs to user
     const progress = await get(
-      'SELECT hours_studied, subject_id FROM progress WHERE id = ? AND user_id = ?',
+      'SELECT hours_studied, subject_id FROM progress WHERE id = $1 AND user_id = $2',
       [id, req.user.id]
     );
 
@@ -227,7 +231,7 @@ router.delete('/:id', auth, validateId, async (req, res) => {
     }
 
     // Delete progress entry
-    await execute('DELETE FROM progress WHERE id = ?', [id]);
+  await execute('DELETE FROM progress WHERE id = $1', [id]);
 
     logger.info(`Progress entry deleted: ${progress.hours_studied}h by user ${req.user.id}`);
 
@@ -249,19 +253,19 @@ router.get('/analytics/overview', auth, async (req, res) => {
         COALESCE(AVG(hours_studied), 0) as avg_hours_per_session,
         COUNT(DISTINCT date) as total_days_studied
        FROM progress 
-       WHERE user_id = ?`,
+       WHERE user_id = $1`,
       [req.user.id]
     );
 
     // Get weekly progress for the last 4 weeks
     const weeklyProgress = await query(
       `SELECT 
-        strftime('%Y-%W', date) as week,
+        to_char(date, 'IYYY-IW') as week,
         SUM(hours_studied) as hours_studied,
         COUNT(DISTINCT date) as days_studied
        FROM progress
-       WHERE user_id = ? AND date >= date('now', '-28 days')
-       GROUP BY strftime('%Y-%W', date)
+       WHERE user_id = $1 AND date >= CURRENT_DATE - INTERVAL '28 days'
+       GROUP BY to_char(date, 'IYYY-IW')
        ORDER BY week DESC`,
       [req.user.id]
     );
@@ -275,8 +279,8 @@ router.get('/analytics/overview', auth, async (req, res) => {
         COUNT(p.id) as total_sessions,
         COALESCE(AVG(p.hours_studied), 0) as avg_hours_per_session
        FROM subjects s
-       LEFT JOIN progress p ON s.id = p.subject_id AND p.user_id = ?
-       WHERE s.user_id = ?
+       LEFT JOIN progress p ON s.id = p.subject_id AND p.user_id = $1
+       WHERE s.user_id = $2
        GROUP BY s.id, s.name, s.color
        ORDER BY total_hours DESC`,
       [req.user.id, req.user.id]
@@ -287,7 +291,7 @@ router.get('/analytics/overview', auth, async (req, res) => {
       `SELECT p.*, s.name as subject_name, s.color as subject_color
        FROM progress p
        LEFT JOIN subjects s ON p.subject_id = s.id
-       WHERE p.user_id = ?
+       WHERE p.user_id = $1
        ORDER BY p.date DESC, p.created_at DESC
        LIMIT 10`,
       [req.user.id]
@@ -315,7 +319,7 @@ router.post('/auto/log-today', auth, async (req, res) => {
       `SELECT ps.id, ps.subject_id, ps.start_time, ps.end_time, ps.duration_minutes, s.name as subject_name
        FROM planner_slots ps
        JOIN subjects s ON ps.subject_id = s.id
-       WHERE ps.user_id = ? AND ps.day_of_week = ?`,
+       WHERE ps.user_id = $1 AND ps.day_of_week = $2`,
       [req.user.id, day]
     );
 
@@ -337,17 +341,17 @@ router.post('/auto/log-today', auth, async (req, res) => {
 
       // Upsert using same aggregation logic
       const existing = await get(
-        'SELECT id, hours_studied FROM progress WHERE user_id = ? AND subject_id = ? AND date = ?',
+        'SELECT id, hours_studied FROM progress WHERE user_id = $1 AND subject_id = $2 AND date = $3',
         [req.user.id, slot.subject_id, today]
       );
       if (existing) {
         await execute(
-          'UPDATE progress SET hours_studied = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+          'UPDATE progress SET hours_studied = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
           [existing.hours_studied + hours, existing.id]
         );
       } else {
         await execute(
-          'INSERT INTO progress (user_id, subject_id, date, hours_studied) VALUES (?, ?, ?, ?, ?)',
+          'INSERT INTO progress (user_id, subject_id, date, hours_studied, notes) VALUES ($1, $2, $3, $4, $5)',
           [req.user.id, slot.subject_id, today, hours, null]
         );
         created++;
@@ -368,7 +372,7 @@ router.get('/subject/:subject_id', auth, validateId, async (req, res) => {
 
     // Verify subject exists and belongs to user
     const subject = await get(
-      'SELECT id FROM subjects WHERE id = ? AND user_id = ?',
+      'SELECT id FROM subjects WHERE id = $1 AND user_id = $2',
       [subject_id, req.user.id]
     );
 
@@ -381,7 +385,7 @@ router.get('/subject/:subject_id', auth, validateId, async (req, res) => {
       `SELECT p.*, s.name as subject_name, s.color as subject_color
        FROM progress p
        LEFT JOIN subjects s ON p.subject_id = s.id
-       WHERE p.user_id = ? AND p.subject_id = ?
+       WHERE p.user_id = $1 AND p.subject_id = $2
        ORDER BY p.date DESC`,
       [req.user.id, subject_id]
     );
@@ -394,7 +398,7 @@ router.get('/subject/:subject_id', auth, validateId, async (req, res) => {
         COALESCE(AVG(hours_studied), 0) as avg_hours_per_session,
         COUNT(DISTINCT date) as total_days_studied
        FROM progress 
-       WHERE user_id = ? AND subject_id = ?`,
+       WHERE user_id = $1 AND subject_id = $2`,
       [req.user.id, subject_id]
     );
 

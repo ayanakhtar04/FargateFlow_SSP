@@ -14,7 +14,7 @@ const auth = async (req, res, next) => {
     
     // Get user from database to ensure they still exist
     const user = await get(
-      'SELECT id, email, name, created_at FROM users WHERE id = ?',
+      'SELECT id, email, name, created_at FROM users WHERE id = $1',
       [decoded.userId]
     );
 
@@ -51,7 +51,7 @@ const optionalAuth = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     const user = await get(
-      'SELECT id, email, name, created_at FROM users WHERE id = ?',
+      'SELECT id, email, name, created_at FROM users WHERE id = $1',
       [decoded.userId]
     );
 

@@ -1,67 +1,64 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+
+
+const { Pool } = require('pg');
 const logger = require('../utils/logger');
 
-// Create database file in the backend directory
-const dbPath = path.join(__dirname, '..', 'database.sqlite');
+// Debug: log env variables used for PostgreSQL connection
+logger.info('PGUSER:', process.env.PGUSER);
+logger.info('PGPASSWORD:', process.env.PGPASSWORD);
+logger.info('PGHOST:', process.env.PGHOST);
+logger.info('PGPORT:', process.env.PGPORT);
+logger.info('PGDATABASE:', process.env.PGDATABASE);
 
-// Create database connection
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    logger.error('Database connection error:', err);
-  } else {
-    logger.info('Connected to SQLite database');
-  }
+// PostgreSQL connection config
+const pool = new Pool({
+  user: process.env.PGUSER || 'postgres',
+  host: process.env.PGHOST || 'localhost',
+  database: process.env.PGDATABASE || 'smart_study_planner',
+  password: process.env.PGPASSWORD || 'postgres',
+  port: process.env.PGPORT ? parseInt(process.env.PGPORT) : 5432,
 });
 
-// Enable foreign keys
-db.run('PRAGMA foreign_keys = ON');
+pool.on('connect', () => {
+  logger.info('Connected to PostgreSQL database');
+});
+pool.on('error', (err) => {
+  logger.error('PostgreSQL error:', err);
+});
 
-// Query function
+// Query function (returns all rows)
 const query = (sql, params = []) => {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) {
-        logger.error('Database query error:', err);
-        reject(err);
-      } else {
-        resolve(rows);
-      }
+  return pool.query(sql, params)
+    .then(res => res.rows)
+    .catch(err => {
+      logger.error('Database query error:', err);
+      throw err;
     });
-  });
 };
 
-// Execute function for INSERT, UPDATE, DELETE
+// Execute function for INSERT, UPDATE, DELETE (returns rowCount and optionally id)
 const execute = (sql, params = []) => {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function(err) {
-      if (err) {
-        logger.error('Database execute error:', err);
-        reject(err);
-      } else {
-        resolve({ id: this.lastID, changes: this.changes });
-      }
+  return pool.query(sql, params)
+    .then(res => ({ rowCount: res.rowCount, id: res.rows[0]?.id }))
+    .catch(err => {
+      logger.error('Database execute error:', err);
+      throw err;
     });
-  });
 };
 
 // Get single row
 const get = (sql, params = []) => {
-  return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-      if (err) {
-        logger.error('Database get error:', err);
-        reject(err);
-      } else {
-        resolve(row);
-      }
+  return pool.query(sql, params)
+    .then(res => res.rows[0])
+    .catch(err => {
+      logger.error('Database get error:', err);
+      throw err;
     });
-  });
 };
 
 module.exports = {
-  db,
+  pool,
   query,
   execute,
   get
-}; 
+};

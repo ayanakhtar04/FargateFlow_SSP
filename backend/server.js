@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+require('dotenv').config({ path: __dirname + '/../.env' });
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const path = require('path');

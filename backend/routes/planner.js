@@ -30,7 +30,7 @@ async function checkSchemaOnce() {
     hasIsActiveColumn = true;
   } catch (_) {
     try {
-      await db.execute('ALTER TABLE planner_slots ADD COLUMN is_active BOOLEAN DEFAULT 1');
+      await db.execute('ALTER TABLE planner_slots ADD COLUMN is_active BOOLEAN DEFAULT true');
       hasIsActiveColumn = true;
     } catch (_) {
       hasIsActiveColumn = false;
@@ -52,28 +52,28 @@ router.get('/', validatePagination, async (req, res) => {
       SELECT ps.*, s.name as subject_name, s.color as subject_color
       FROM planner_slots ps
       JOIN subjects s ON ps.subject_id = s.id
-      WHERE ps.user_id = ?
+      WHERE ps.user_id = $1
     `;
     let params = [req.user.id];
     let paramIndex = 2;
 
     if (day_of_week !== undefined) {
-      query += ` AND ps.day_of_week = ?`;
+      query += ` AND ps.day_of_week = $${paramIndex}`;
       params.push(parseInt(day_of_week));
       paramIndex++;
     }
 
-    query += ` ORDER BY ps.day_of_week, ps.start_time LIMIT ? OFFSET ?`;
+    query += ` ORDER BY ps.day_of_week, ps.start_time LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     params.push(limit, offset);
 
     const result = await db.query(query, params);
 
     // Get total count for pagination
-    let countQuery = 'SELECT COUNT(*) as count FROM planner_slots WHERE user_id = ?';
+    let countQuery = 'SELECT COUNT(*) as count FROM planner_slots WHERE user_id = $1';
     let countParams = [req.user.id];
 
     if (day_of_week !== undefined) {
-      countQuery += ' AND day_of_week = ?';
+      countQuery += ' AND day_of_week = $2';
       countParams.push(parseInt(day_of_week));
     }
 
@@ -111,7 +111,7 @@ router.get('/day/:day_of_week', async (req, res) => {
       `SELECT ps.*, s.name as subject_name, s.color as subject_color
        FROM planner_slots ps
        JOIN subjects s ON ps.subject_id = s.id
-       WHERE ps.user_id = ? AND ps.day_of_week = ?
+       WHERE ps.user_id = $1 AND ps.day_of_week = $2
        ORDER BY ps.start_time`,
       [req.user.id, day]
     );
@@ -135,7 +135,7 @@ router.get('/:id', validateId, async (req, res) => {
       `SELECT ps.*, s.name as subject_name, s.color as subject_color
        FROM planner_slots ps
        JOIN subjects s ON ps.subject_id = s.id
-       WHERE ps.id = ? AND ps.user_id = ?`,
+       WHERE ps.id = $1 AND ps.user_id = $2`,
       [id, req.user.id]
     );
 
@@ -161,7 +161,7 @@ router.post('/', validatePlannerSlot, async (req, res) => {
 
     // Check if subject exists and belongs to user
     const subjectExists = await db.get(
-      'SELECT id FROM subjects WHERE id = ? AND user_id = ?',
+      'SELECT id FROM subjects WHERE id = $1 AND user_id = $2',
       [subject_id, req.user.id]
     );
 
@@ -172,8 +172,8 @@ router.post('/', validatePlannerSlot, async (req, res) => {
     // Check for time conflicts on the same day
     const timeConflict = await db.query(
       `SELECT id FROM planner_slots 
-       WHERE user_id = ? AND day_of_week = ? 
-       AND ((start_time <= ? AND end_time > ?) OR (start_time < ? AND end_time >= ?) OR (start_time >= ? AND end_time <= ?))`,
+       WHERE user_id = $1 AND day_of_week = $2 
+       AND ((start_time <= $3 AND end_time > $4) OR (start_time < $5 AND end_time >= $6) OR (start_time >= $7 AND end_time <= $8))`,
       [req.user.id, day_of_week, start_time, start_time, end_time, end_time, start_time, end_time]
     );
 
@@ -193,12 +193,12 @@ router.post('/', validatePlannerSlot, async (req, res) => {
     let insertParams;
     if (hasDurationColumn) {
       insertSql = `INSERT INTO planner_slots (user_id, subject_id, day_of_week, start_time, end_time, duration_minutes${hasIsActiveColumn ? ', is_active' : ''}, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?${hasIsActiveColumn ? ', 1' : ''}, datetime('now'), datetime('now'))`;
+                   VALUES ($1, $2, $3, $4, $5, $6${hasIsActiveColumn ? ', true' : ''}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`;
       insertParams = [req.user.id, subject_id, day_of_week, start_time, end_time, duration];
     } else {
       // Fallback without duration column
       insertSql = `INSERT INTO planner_slots (user_id, subject_id, day_of_week, start_time, end_time${hasIsActiveColumn ? ', is_active' : ''}, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?${hasIsActiveColumn ? ', 1' : ''}, datetime('now'), datetime('now'))`;
+                   VALUES ($1, $2, $3, $4, $5${hasIsActiveColumn ? ', true' : ''}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`;
       insertParams = [req.user.id, subject_id, day_of_week, start_time, end_time];
     }
     const result = await db.execute(insertSql, insertParams);
@@ -208,7 +208,7 @@ router.post('/', validatePlannerSlot, async (req, res) => {
       `SELECT ps.*, s.name as subject_name, s.color as subject_color
        FROM planner_slots ps
        JOIN subjects s ON ps.subject_id = s.id
-       WHERE ps.id = ?`,
+       WHERE ps.id = $1`,
       [result.id]
     );
 
@@ -231,7 +231,7 @@ router.put('/:id', validateId, validatePlannerSlot, async (req, res) => {
 
     // Check if planner slot exists and belongs to user
     const existingSlot = await db.get(
-      'SELECT id FROM planner_slots WHERE id = ? AND user_id = ?',
+      'SELECT id FROM planner_slots WHERE id = $1 AND user_id = $2',
       [id, req.user.id]
     );
 
@@ -241,7 +241,7 @@ router.put('/:id', validateId, validatePlannerSlot, async (req, res) => {
 
     // Check if subject exists and belongs to user
     const subjectExists = await db.get(
-      'SELECT id FROM subjects WHERE id = ? AND user_id = ?',
+      'SELECT id FROM subjects WHERE id = $1 AND user_id = $2',
       [subject_id, req.user.id]
     );
 
@@ -252,8 +252,8 @@ router.put('/:id', validateId, validatePlannerSlot, async (req, res) => {
     // Check for time conflicts on the same day (excluding current slot)
     const timeConflict = await db.query(
       `SELECT id FROM planner_slots 
-       WHERE user_id = ? AND day_of_week = ? AND id != ?
-       AND ((start_time <= ? AND end_time > ?) OR (start_time < ? AND end_time >= ?) OR (start_time >= ? AND end_time <= ?))`,
+       WHERE user_id = $1 AND day_of_week = $2 AND id != $3
+       AND ((start_time <= $4 AND end_time > $5) OR (start_time < $6 AND end_time >= $7) OR (start_time >= $8 AND end_time <= $9))`,
       [req.user.id, day_of_week, id, start_time, start_time, end_time, end_time, start_time, end_time]
     );
 
@@ -273,13 +273,13 @@ router.put('/:id', validateId, validatePlannerSlot, async (req, res) => {
     let updateParams;
     if (hasDurationColumn) {
       updateSql = `UPDATE planner_slots 
-                   SET subject_id = ?, day_of_week = ?, start_time = ?, end_time = ?, duration_minutes = ?, updated_at = datetime('now')
-                   WHERE id = ? AND user_id = ?`;
+                   SET subject_id = $1, day_of_week = $2, start_time = $3, end_time = $4, duration_minutes = $5, updated_at = CURRENT_TIMESTAMP
+                   WHERE id = $6 AND user_id = $7`;
       updateParams = [subject_id, day_of_week, start_time, end_time, duration, id, req.user.id];
     } else {
       updateSql = `UPDATE planner_slots 
-                   SET subject_id = ?, day_of_week = ?, start_time = ?, end_time = ?, updated_at = datetime('now')
-                   WHERE id = ? AND user_id = ?`;
+                   SET subject_id = $1, day_of_week = $2, start_time = $3, end_time = $4, updated_at = CURRENT_TIMESTAMP
+                   WHERE id = $5 AND user_id = $6`;
       updateParams = [subject_id, day_of_week, start_time, end_time, id, req.user.id];
     }
     await db.execute(updateSql, updateParams);
@@ -289,7 +289,7 @@ router.put('/:id', validateId, validatePlannerSlot, async (req, res) => {
       `SELECT ps.*, s.name as subject_name, s.color as subject_color
        FROM planner_slots ps
        JOIN subjects s ON ps.subject_id = s.id
-       WHERE ps.id = ?`,
+       WHERE ps.id = $1`,
       [id]
     );
 
@@ -310,7 +310,7 @@ router.delete('/:id', validateId, async (req, res) => {
 
     // Check if planner slot exists and belongs to user
     const existingSlot = await db.get(
-      'SELECT id FROM planner_slots WHERE id = ? AND user_id = ?',
+      'SELECT id FROM planner_slots WHERE id = $1 AND user_id = $2',
       [id, req.user.id]
     );
 
@@ -319,7 +319,7 @@ router.delete('/:id', validateId, async (req, res) => {
     }
 
     await db.execute(
-      'DELETE FROM planner_slots WHERE id = ? AND user_id = ?',
+      'DELETE FROM planner_slots WHERE id = $1 AND user_id = $2',
       [id, req.user.id]
     );
 
@@ -347,7 +347,7 @@ router.put('/bulk/update', async (req, res) => {
 
       // Check if slot exists and belongs to user
       const existingSlot = await db.get(
-        'SELECT id FROM planner_slots WHERE id = ? AND user_id = ?',
+        'SELECT id FROM planner_slots WHERE id = $1 AND user_id = $2',
         [id, req.user.id]
       );
 
@@ -359,8 +359,8 @@ router.put('/bulk/update', async (req, res) => {
       // Check for time conflicts (excluding current slot)
       const timeConflict = await db.query(
         `SELECT id FROM planner_slots 
-         WHERE user_id = ? AND day_of_week = ? AND id != ?
-         AND ((start_time <= ? AND end_time > ?) OR (start_time < ? AND end_time >= ?) OR (start_time >= ? AND end_time <= ?))`,
+         WHERE user_id = $1 AND day_of_week = $2 AND id != $3
+         AND ((start_time <= $4 AND end_time > $5) OR (start_time < $6 AND end_time >= $7) OR (start_time >= $8 AND end_time <= $9))`,
         [req.user.id, day_of_week, id, start_time, start_time, end_time, end_time, start_time, end_time]
       );
 
@@ -372,8 +372,8 @@ router.put('/bulk/update', async (req, res) => {
       // Update slot
       await db.execute(
         `UPDATE planner_slots 
-         SET day_of_week = ?, start_time = ?, end_time = ?, updated_at = datetime('now')
-         WHERE id = ? AND user_id = ?`,
+         SET day_of_week = $1, start_time = $2, end_time = $3, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $4 AND user_id = $5`,
         [day_of_week, start_time, end_time, id, req.user.id]
       );
 
@@ -398,7 +398,7 @@ router.get('/weekly/summary', async (req, res) => {
   try {
     await checkSchemaOnce();
     const durationSelect = hasDurationColumn ? 'SUM(ps.duration_minutes) as total_minutes,' : '0 as total_minutes,';
-    const isActiveCondition = hasIsActiveColumn ? 'AND ps.is_active = 1' : '';
+  const isActiveCondition = hasIsActiveColumn ? 'AND ps.is_active = true' : '';
     const result = await db.query(
       `SELECT 
         ps.day_of_week,

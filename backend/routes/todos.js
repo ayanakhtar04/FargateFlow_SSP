@@ -12,22 +12,26 @@ router.get('/', auth, validatePagination, async (req, res) => {
     const { page = 1, limit = 10, status, subject_id, priority } = req.query;
     const offset = (page - 1) * limit;
 
-    let whereClause = 'WHERE t.user_id = ?';
+    let whereClause = 'WHERE t.user_id = $1';
     let params = [req.user.id];
+    let paramIndex = 2;
 
     if (status) {
-      whereClause += ' AND t.is_completed = ?';
-      params.push(status === 'completed' ? 1 : 0);
+      whereClause += ` AND t.is_completed = $${paramIndex}`;
+      params.push(status === 'completed' ? true : false);
+      paramIndex++;
     }
 
     if (subject_id) {
-      whereClause += ' AND t.subject_id = ?';
+      whereClause += ` AND t.subject_id = $${paramIndex}`;
       params.push(subject_id);
+      paramIndex++;
     }
 
     if (priority) {
-      whereClause += ' AND t.priority = ?';
+      whereClause += ` AND t.priority = $${paramIndex}`;
       params.push(priority);
+      paramIndex++;
     }
 
     // Get todos with subject info
@@ -37,7 +41,7 @@ router.get('/', auth, validatePagination, async (req, res) => {
        LEFT JOIN subjects s ON t.subject_id = s.id
        ${whereClause}
        ORDER BY t.created_at DESC
-       LIMIT ? OFFSET ?`,
+       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
       [...params, parseInt(limit), offset]
     );
 
@@ -72,7 +76,7 @@ router.get('/today', auth, async (req, res) => {
       `SELECT ps.*, s.name as subject_name, s.color as subject_color
        FROM planner_slots ps
        LEFT JOIN subjects s ON ps.subject_id = s.id
-       WHERE ps.user_id = ? AND ps.day_of_week = ?`,
+       WHERE ps.user_id = $1 AND ps.day_of_week = $2`,
       [req.user.id, today]
     );
 
@@ -81,7 +85,7 @@ router.get('/today', auth, async (req, res) => {
       `SELECT t.*, s.name as subject_name, s.color as subject_color
        FROM todos t
        LEFT JOIN subjects s ON t.subject_id = s.id
-       WHERE t.user_id = ? AND DATE(t.created_at) = DATE('now')`,
+       WHERE t.user_id = $1 AND DATE(t.created_at) = CURRENT_DATE`,
       [req.user.id]
     );
 
@@ -89,7 +93,7 @@ router.get('/today', auth, async (req, res) => {
     if (existingTodos.length === 0 && plannerSlots.length > 0) {
       const todoPromises = plannerSlots.map(slot => 
         execute(
-          'INSERT INTO todos (user_id, subject_id, title, description, priority) VALUES (?, ?, ?, ?, ?)',
+          'INSERT INTO todos (user_id, subject_id, title, description, priority) VALUES ($1, $2, $3, $4, $5)',
           [req.user.id, slot.subject_id, slot.title || `Study ${slot.subject_name}`, slot.description, 'medium']
         )
       );
@@ -101,7 +105,7 @@ router.get('/today', auth, async (req, res) => {
         `SELECT t.*, s.name as subject_name, s.color as subject_color
          FROM todos t
          LEFT JOIN subjects s ON t.subject_id = s.id
-         WHERE t.user_id = ? AND DATE(t.created_at) = DATE('now')`,
+         WHERE t.user_id = $1 AND DATE(t.created_at) = CURRENT_DATE`,
         [req.user.id]
       );
 
@@ -123,7 +127,7 @@ router.post('/', auth, validateTodo, async (req, res) => {
     // Verify subject exists and belongs to user (if provided)
     if (subject_id) {
       const subject = await get(
-        'SELECT id FROM subjects WHERE id = ? AND user_id = ?',
+        'SELECT id FROM subjects WHERE id = $1 AND user_id = $2',
         [subject_id, req.user.id]
       );
 
@@ -134,7 +138,7 @@ router.post('/', auth, validateTodo, async (req, res) => {
 
     // Create todo
     const result = await execute(
-      'INSERT INTO todos (user_id, subject_id, title, description, due_date, priority) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO todos (user_id, subject_id, title, description, due_date, priority) VALUES ($1, $2, $3, $4, $5, $6)',
       [req.user.id, subject_id, title, description, due_date, priority || 'medium']
     );
 
@@ -143,7 +147,7 @@ router.post('/', auth, validateTodo, async (req, res) => {
       `SELECT t.*, s.name as subject_name, s.color as subject_color
        FROM todos t
        LEFT JOIN subjects s ON t.subject_id = s.id
-       WHERE t.id = ?`,
+       WHERE t.id = $1`,
       [result.id]
     );
 
@@ -168,7 +172,7 @@ router.get('/:id', auth, validateId, async (req, res) => {
       `SELECT t.*, s.name as subject_name, s.color as subject_color
        FROM todos t
        LEFT JOIN subjects s ON t.subject_id = s.id
-       WHERE t.id = ? AND t.user_id = ?`,
+       WHERE t.id = $1 AND t.user_id = $2`,
       [id, req.user.id]
     );
 
@@ -191,7 +195,7 @@ router.put('/:id', auth, validateId, validateTodo, async (req, res) => {
 
     // Check if todo exists and belongs to user
     const existingTodo = await get(
-      'SELECT id FROM todos WHERE id = ? AND user_id = ?',
+      'SELECT id FROM todos WHERE id = $1 AND user_id = $2',
       [id, req.user.id]
     );
 
@@ -202,7 +206,7 @@ router.put('/:id', auth, validateId, validateTodo, async (req, res) => {
     // Verify subject exists and belongs to user (if provided)
     if (subject_id) {
       const subject = await get(
-        'SELECT id FROM subjects WHERE id = ? AND user_id = ?',
+        'SELECT id FROM subjects WHERE id = $1 AND user_id = $2',
         [subject_id, req.user.id]
       );
 
@@ -213,7 +217,7 @@ router.put('/:id', auth, validateId, validateTodo, async (req, res) => {
 
     // Update todo
     await execute(
-      'UPDATE todos SET title = ?, description = ?, subject_id = ?, due_date = ?, priority = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      'UPDATE todos SET title = $1, description = $2, subject_id = $3, due_date = $4, priority = $5, updated_at = CURRENT_TIMESTAMP WHERE id = $6',
       [title, description, subject_id, due_date, priority, id]
     );
 
@@ -222,7 +226,7 @@ router.put('/:id', auth, validateId, validateTodo, async (req, res) => {
       `SELECT t.*, s.name as subject_name, s.color as subject_color
        FROM todos t
        LEFT JOIN subjects s ON t.subject_id = s.id
-       WHERE t.id = ?`,
+       WHERE t.id = $1`,
       [id]
     );
 
@@ -245,7 +249,7 @@ router.patch('/:id/toggle', auth, validateId, async (req, res) => {
 
     // Check if todo exists and belongs to user
     const todo = await get(
-      'SELECT id, title, is_completed FROM todos WHERE id = ? AND user_id = ?',
+      'SELECT id, title, is_completed FROM todos WHERE id = $1 AND user_id = $2',
       [id, req.user.id]
     );
 
@@ -254,9 +258,9 @@ router.patch('/:id/toggle', auth, validateId, async (req, res) => {
     }
 
     // Toggle completion status
-    const newStatus = todo.is_completed ? 0 : 1;
+    const newStatus = !todo.is_completed;
     await execute(
-      'UPDATE todos SET is_completed = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      'UPDATE todos SET is_completed = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
       [newStatus, id]
     );
 
@@ -279,7 +283,7 @@ router.delete('/:id', auth, validateId, async (req, res) => {
 
     // Check if todo exists and belongs to user
     const todo = await get(
-      'SELECT title FROM todos WHERE id = ? AND user_id = ?',
+      'SELECT title FROM todos WHERE id = $1 AND user_id = $2',
       [id, req.user.id]
     );
 
@@ -288,7 +292,7 @@ router.delete('/:id', auth, validateId, async (req, res) => {
     }
 
     // Delete todo
-    await execute('DELETE FROM todos WHERE id = ?', [id]);
+  await execute('DELETE FROM todos WHERE id = $1', [id]);
 
     logger.info(`Todo deleted: ${todo.title} by user ${req.user.id}`);
 
@@ -308,10 +312,10 @@ router.put('/bulk/update', auth, async (req, res) => {
       return res.status(400).json({ error: 'Todos array is required' });
     }
 
-    const updatePromises = todos.map(todo => 
+    const updatePromises = todos.map((todo, idx) => 
       execute(
-        'UPDATE todos SET title = ?, description = ?, subject_id = ?, due_date = ?, priority = ?, is_completed = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?',
-        [todo.title, todo.description, todo.subject_id, todo.due_date, todo.priority, todo.is_completed ? 1 : 0, todo.id, req.user.id]
+        'UPDATE todos SET title = $1, description = $2, subject_id = $3, due_date = $4, priority = $5, is_completed = $6, updated_at = CURRENT_TIMESTAMP WHERE id = $7 AND user_id = $8',
+        [todo.title, todo.description, todo.subject_id, todo.due_date, todo.priority, !!todo.is_completed, todo.id, req.user.id]
       )
     );
 
@@ -331,11 +335,11 @@ router.get('/stats/overview', auth, async (req, res) => {
     const overallStats = await get(
       `SELECT 
         COUNT(*) as total_todos,
-        COUNT(CASE WHEN is_completed = 1 THEN 1 END) as completed_todos,
-        COUNT(CASE WHEN is_completed = 0 THEN 1 END) as pending_todos,
-        COUNT(CASE WHEN due_date < DATE('now') AND is_completed = 0 THEN 1 END) as overdue_todos
+        COUNT(CASE WHEN is_completed = true THEN 1 END) as completed_todos,
+        COUNT(CASE WHEN is_completed = false THEN 1 END) as pending_todos,
+        COUNT(CASE WHEN due_date < CURRENT_DATE AND is_completed = false THEN 1 END) as overdue_todos
        FROM todos 
-       WHERE user_id = ?`,
+       WHERE user_id = $1`,
       [req.user.id]
     );
 
@@ -345,11 +349,11 @@ router.get('/stats/overview', auth, async (req, res) => {
         s.name as subject_name,
         s.color as subject_color,
         COUNT(t.id) as total_todos,
-        COUNT(CASE WHEN t.is_completed = 1 THEN 1 END) as completed_todos,
-        ROUND(CAST(COUNT(CASE WHEN t.is_completed = 1 THEN 1 END) AS FLOAT) / COUNT(t.id) * 100, 2) as completion_rate
+        COUNT(CASE WHEN t.is_completed = true THEN 1 END) as completed_todos,
+        ROUND(CAST(COUNT(CASE WHEN t.is_completed = true THEN 1 END) AS FLOAT) / COUNT(t.id) * 100, 2::int) as completion_rate
        FROM todos t
        LEFT JOIN subjects s ON t.subject_id = s.id
-       WHERE t.user_id = ?
+       WHERE t.user_id = $1
        GROUP BY s.id, s.name, s.color
        ORDER BY completion_rate DESC`,
       [req.user.id]
@@ -361,7 +365,7 @@ router.get('/stats/overview', auth, async (req, res) => {
         priority,
         COUNT(*) as count
        FROM todos 
-       WHERE user_id = ?
+       WHERE user_id = $1
        GROUP BY priority`,
       [req.user.id]
     );

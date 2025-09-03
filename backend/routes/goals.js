@@ -12,17 +12,20 @@ router.get('/', auth, validatePagination, async (req, res) => {
     const { page = 1, limit = 10, status, subject_id } = req.query;
     const offset = (page - 1) * limit;
 
-    let whereClause = 'WHERE g.user_id = ?';
+    let whereClause = 'WHERE g.user_id = $1';
     let params = [req.user.id];
+    let paramIndex = 2;
 
     if (status) {
-      whereClause += ' AND g.is_completed = ?';
-      params.push(status === 'completed' ? 1 : 0);
+      whereClause += ` AND g.is_completed = $${paramIndex}`;
+      params.push(status === 'completed' ? true : false);
+      paramIndex++;
     }
 
     if (subject_id) {
-      whereClause += ' AND g.subject_id = ?';
+      whereClause += ` AND g.subject_id = $${paramIndex}`;
       params.push(subject_id);
+      paramIndex++;
     }
 
     // Get goals with subject info
@@ -32,7 +35,7 @@ router.get('/', auth, validatePagination, async (req, res) => {
        LEFT JOIN subjects s ON g.subject_id = s.id
        ${whereClause}
        ORDER BY g.created_at DESC
-       LIMIT ? OFFSET ?`,
+       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
       [...params, parseInt(limit), offset]
     );
 
@@ -65,7 +68,7 @@ router.post('/', auth, validateGoalCreate, async (req, res) => {
     // Verify subject exists and belongs to user (if provided)
     if (subject_id) {
       const subject = await get(
-        'SELECT id FROM subjects WHERE id = ? AND user_id = ?',
+        'SELECT id FROM subjects WHERE id = $1 AND user_id = $2',
         [subject_id, req.user.id]
       );
 
@@ -76,7 +79,7 @@ router.post('/', auth, validateGoalCreate, async (req, res) => {
 
     // Create goal
     const result = await execute(
-      'INSERT INTO goals (user_id, subject_id, title, description, target_hours, due_date) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO goals (user_id, subject_id, title, description, target_hours, due_date) VALUES ($1, $2, $3, $4, $5, $6)',
       [req.user.id, subject_id, title, description, target_hours || 0, due_date]
     );
 
@@ -85,7 +88,7 @@ router.post('/', auth, validateGoalCreate, async (req, res) => {
       `SELECT g.*, s.name as subject_name, s.color as subject_color
        FROM goals g
        LEFT JOIN subjects s ON g.subject_id = s.id
-       WHERE g.id = ?`,
+       WHERE g.id = $1`,
       [result.id]
     );
 
@@ -110,7 +113,7 @@ router.get('/:id', auth, validateId, async (req, res) => {
       `SELECT g.*, s.name as subject_name, s.color as subject_color
        FROM goals g
        LEFT JOIN subjects s ON g.subject_id = s.id
-       WHERE g.id = ? AND g.user_id = ?`,
+       WHERE g.id = $1 AND g.user_id = $2`,
       [id, req.user.id]
     );
 
@@ -133,7 +136,7 @@ router.put('/:id', auth, validateId, validateGoalUpdate, async (req, res) => {
 
     // Check if goal exists and belongs to user
     const existingGoal = await get(
-      'SELECT id FROM goals WHERE id = ? AND user_id = ?',
+      'SELECT id FROM goals WHERE id = $1 AND user_id = $2',
       [id, req.user.id]
     );
 
@@ -144,7 +147,7 @@ router.put('/:id', auth, validateId, validateGoalUpdate, async (req, res) => {
     // Verify subject exists and belongs to user (if provided)
     if (subject_id) {
       const subject = await get(
-        'SELECT id FROM subjects WHERE id = ? AND user_id = ?',
+        'SELECT id FROM subjects WHERE id = $1 AND user_id = $2',
         [subject_id, req.user.id]
       );
 
@@ -156,19 +159,20 @@ router.put('/:id', auth, validateId, validateGoalUpdate, async (req, res) => {
     // Build dynamic update set
     const fields = [];
     const params = [];
-    if (title !== undefined) { fields.push('title = ?'); params.push(title); }
-    if (description !== undefined) { fields.push('description = ?'); params.push(description); }
-    if (subject_id !== undefined) { fields.push('subject_id = ?'); params.push(subject_id || null); }
-    if (target_hours !== undefined) { fields.push('target_hours = ?'); params.push(target_hours); }
-    if (due_date !== undefined) { fields.push('due_date = ?'); params.push(due_date || null); }
-    if (is_completed !== undefined) { fields.push('is_completed = ?'); params.push(is_completed ? 1 : 0); }
+    let paramIndex = 1;
+    if (title !== undefined) { fields.push(`title = $${paramIndex++}`); params.push(title); }
+    if (description !== undefined) { fields.push(`description = $${paramIndex++}`); params.push(description); }
+    if (subject_id !== undefined) { fields.push(`subject_id = $${paramIndex++}`); params.push(subject_id || null); }
+    if (target_hours !== undefined) { fields.push(`target_hours = $${paramIndex++}`); params.push(target_hours); }
+    if (due_date !== undefined) { fields.push(`due_date = $${paramIndex++}`); params.push(due_date || null); }
+  if (is_completed !== undefined) { fields.push(`is_completed = $${paramIndex++}`); params.push(!!is_completed); }
 
     if (fields.length === 0) {
       return res.status(400).json({ error: 'No valid fields provided for update' });
     }
 
     fields.push('updated_at = CURRENT_TIMESTAMP');
-    const sql = `UPDATE goals SET ${fields.join(', ')} WHERE id = ?`;
+    const sql = `UPDATE goals SET ${fields.join(', ')} WHERE id = $${paramIndex}`;
     params.push(id);
     await execute(sql, params);
 
@@ -177,7 +181,7 @@ router.put('/:id', auth, validateId, validateGoalUpdate, async (req, res) => {
       `SELECT g.*, s.name as subject_name, s.color as subject_color
        FROM goals g
        LEFT JOIN subjects s ON g.subject_id = s.id
-       WHERE g.id = ?`,
+       WHERE g.id = $1`,
       [id]
     );
 
@@ -201,7 +205,7 @@ router.patch('/:id/progress', auth, validateId, async (req, res) => {
 
     // Check if goal exists and belongs to user
     const goal = await get(
-      'SELECT id, title, target_hours, completed_hours FROM goals WHERE id = ? AND user_id = ?',
+      'SELECT id, title, target_hours, completed_hours FROM goals WHERE id = $1 AND user_id = $2',
       [id, req.user.id]
     );
 
@@ -214,8 +218,8 @@ router.patch('/:id/progress', auth, validateId, async (req, res) => {
 
     // Update goal progress
     await execute(
-      'UPDATE goals SET completed_hours = ?, is_completed = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [newCompletedHours, isCompleted ? 1 : 0, id]
+      'UPDATE goals SET completed_hours = $1, is_completed = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+      [newCompletedHours, isCompleted, id]
     );
 
     logger.info(`Goal progress updated: ${goal.title} by user ${req.user.id}`);
@@ -238,7 +242,7 @@ router.delete('/:id', auth, validateId, async (req, res) => {
 
     // Check if goal exists and belongs to user
     const goal = await get(
-      'SELECT title FROM goals WHERE id = ? AND user_id = ?',
+      'SELECT title FROM goals WHERE id = $1 AND user_id = $2',
       [id, req.user.id]
     );
 
@@ -247,7 +251,7 @@ router.delete('/:id', auth, validateId, async (req, res) => {
     }
 
     // Delete goal
-    await execute('DELETE FROM goals WHERE id = ?', [id]);
+  await execute('DELETE FROM goals WHERE id = $1', [id]);
 
     logger.info(`Goal deleted: ${goal.title} by user ${req.user.id}`);
 
@@ -265,12 +269,12 @@ router.get('/stats/overview', auth, async (req, res) => {
     const overallStats = await get(
       `SELECT 
         COUNT(*) as total_goals,
-        COUNT(CASE WHEN is_completed = 1 THEN 1 END) as completed_goals,
-        COUNT(CASE WHEN is_completed = 0 THEN 1 END) as pending_goals,
+        COUNT(CASE WHEN is_completed = true THEN 1 END) as completed_goals,
+        COUNT(CASE WHEN is_completed = false THEN 1 END) as pending_goals,
         COALESCE(SUM(target_hours), 0) as total_target_hours,
         COALESCE(SUM(completed_hours), 0) as total_completed_hours
        FROM goals 
-       WHERE user_id = ?`,
+       WHERE user_id = $1`,
       [req.user.id]
     );
 
@@ -280,13 +284,13 @@ router.get('/stats/overview', auth, async (req, res) => {
         s.name as subject_name,
         s.color as subject_color,
         COUNT(g.id) as total_goals,
-        COUNT(CASE WHEN g.is_completed = 1 THEN 1 END) as completed_goals,
+        COUNT(CASE WHEN g.is_completed = true THEN 1 END) as completed_goals,
         COALESCE(SUM(g.target_hours), 0) as total_target_hours,
         COALESCE(SUM(g.completed_hours), 0) as total_completed_hours,
-        ROUND(CAST(COUNT(CASE WHEN g.is_completed = 1 THEN 1 END) AS FLOAT) / COUNT(g.id) * 100, 2) as completion_rate
+        ROUND(CAST(COUNT(CASE WHEN g.is_completed = true THEN 1 END) AS FLOAT) / COUNT(g.id) * 100, 2::int) as completion_rate
        FROM goals g
        LEFT JOIN subjects s ON g.subject_id = s.id
-       WHERE g.user_id = ?
+       WHERE g.user_id = $1
        GROUP BY s.id, s.name, s.color
        ORDER BY completion_rate DESC`,
       [req.user.id]
@@ -297,7 +301,7 @@ router.get('/stats/overview', auth, async (req, res) => {
       `SELECT g.*, s.name as subject_name, s.color as subject_color
        FROM goals g
        LEFT JOIN subjects s ON g.subject_id = s.id
-       WHERE g.user_id = ?
+       WHERE g.user_id = $1
        ORDER BY g.created_at DESC
        LIMIT 5`,
       [req.user.id]

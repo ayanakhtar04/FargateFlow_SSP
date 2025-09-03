@@ -16,24 +16,24 @@ router.get('/', auth, validatePagination, async (req, res) => {
     const subjects = await query(
       `SELECT s.*, 
         COUNT(DISTINCT t.id) as total_todos,
-        COUNT(DISTINCT CASE WHEN t.is_completed = 1 THEN t.id END) as completed_todos,
+        COUNT(DISTINCT CASE WHEN t.is_completed = TRUE THEN t.id END) as completed_todos,
         COUNT(DISTINCT g.id) as total_goals,
-        COUNT(DISTINCT CASE WHEN g.is_completed = 1 THEN g.id END) as completed_goals,
+        COUNT(DISTINCT CASE WHEN g.is_completed = TRUE THEN g.id END) as completed_goals,
         COALESCE(SUM(p.hours_studied), 0) as total_hours
        FROM subjects s
        LEFT JOIN todos t ON s.id = t.subject_id
        LEFT JOIN goals g ON s.id = g.subject_id
        LEFT JOIN progress p ON s.id = p.subject_id
-       WHERE s.user_id = ?
+       WHERE s.user_id = $1
        GROUP BY s.id
        ORDER BY s.created_at DESC
-       LIMIT ? OFFSET ?`,
+       LIMIT $2 OFFSET $3`,
       [req.user.id, parseInt(limit), offset]
     );
 
     // Get total count
     const countResult = await get(
-      'SELECT COUNT(*) as total FROM subjects WHERE user_id = ?',
+      'SELECT COUNT(*) as total FROM subjects WHERE user_id = $1',
       [req.user.id]
     );
 
@@ -59,7 +59,7 @@ router.post('/', auth, validateSubject, async (req, res) => {
 
     // Check if subject name already exists for this user
     const existingSubject = await get(
-      'SELECT id FROM subjects WHERE user_id = ? AND name = ?',
+      'SELECT id FROM subjects WHERE user_id = $1 AND name = $2',
       [req.user.id, name]
     );
 
@@ -69,13 +69,13 @@ router.post('/', auth, validateSubject, async (req, res) => {
 
     // Create subject
     const result = await execute(
-      'INSERT INTO subjects (user_id, name, description, color) VALUES (?, ?, ?, ?)',
+      'INSERT INTO subjects (user_id, name, description, color) VALUES ($1, $2, $3, $4) RETURNING id',
       [req.user.id, name, description, color || '#3B82F6']
     );
 
     // Get the created subject
     const subject = await get(
-      'SELECT * FROM subjects WHERE id = ?',
+      'SELECT * FROM subjects WHERE id = $1',
       [result.id]
     );
 
@@ -100,15 +100,15 @@ router.get('/:id', auth, validateId, async (req, res) => {
     const subject = await get(
       `SELECT s.*, 
         COUNT(DISTINCT t.id) as total_todos,
-        COUNT(DISTINCT CASE WHEN t.is_completed = 1 THEN t.id END) as completed_todos,
+        COUNT(DISTINCT CASE WHEN t.is_completed = TRUE THEN t.id END) as completed_todos,
         COUNT(DISTINCT g.id) as total_goals,
-        COUNT(DISTINCT CASE WHEN g.is_completed = 1 THEN g.id END) as completed_goals,
+        COUNT(DISTINCT CASE WHEN g.is_completed = TRUE THEN g.id END) as completed_goals,
         COALESCE(SUM(p.hours_studied), 0) as total_hours
        FROM subjects s
        LEFT JOIN todos t ON s.id = t.subject_id
        LEFT JOIN goals g ON s.id = g.subject_id
        LEFT JOIN progress p ON s.id = p.subject_id
-       WHERE s.id = ? AND s.user_id = ?
+       WHERE s.id = $1 AND s.user_id = $2
        GROUP BY s.id`,
       [id, req.user.id]
     );
@@ -132,7 +132,7 @@ router.put('/:id', auth, validateId, validateSubject, async (req, res) => {
 
     // Check if subject exists and belongs to user
     const existingSubject = await get(
-      'SELECT id FROM subjects WHERE id = ? AND user_id = ?',
+      'SELECT id FROM subjects WHERE id = $1 AND user_id = $2',
       [id, req.user.id]
     );
 
@@ -143,7 +143,7 @@ router.put('/:id', auth, validateId, validateSubject, async (req, res) => {
     // Check if new name conflicts with existing subject
     if (name) {
       const nameConflict = await get(
-        'SELECT id FROM subjects WHERE user_id = ? AND name = ? AND id != ?',
+        'SELECT id FROM subjects WHERE user_id = $1 AND name = $2 AND id != $3',
         [req.user.id, name, id]
       );
 
@@ -154,13 +154,13 @@ router.put('/:id', auth, validateId, validateSubject, async (req, res) => {
 
     // Update subject
     await execute(
-      'UPDATE subjects SET name = ?, description = ?, color = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      'UPDATE subjects SET name = $1, description = $2, color = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4',
       [name, description, color, id]
     );
 
     // Get updated subject
     const subject = await get(
-      'SELECT * FROM subjects WHERE id = ?',
+      'SELECT * FROM subjects WHERE id = $1',
       [id]
     );
 
@@ -183,7 +183,7 @@ router.delete('/:id', auth, validateId, async (req, res) => {
 
     // Check if subject exists and belongs to user
     const subject = await get(
-      'SELECT name FROM subjects WHERE id = ? AND user_id = ?',
+      'SELECT name FROM subjects WHERE id = $1 AND user_id = $2',
       [id, req.user.id]
     );
 
@@ -192,7 +192,7 @@ router.delete('/:id', auth, validateId, async (req, res) => {
     }
 
     // Delete subject (cascade will handle related data)
-    await execute('DELETE FROM subjects WHERE id = ?', [id]);
+  await execute('DELETE FROM subjects WHERE id = $1', [id]);
 
     logger.info(`Subject deleted: ${subject.name} by user ${req.user.id}`);
 
@@ -210,7 +210,7 @@ router.get('/:id/stats', auth, validateId, async (req, res) => {
 
     // Check if subject exists and belongs to user
     const subject = await get(
-      'SELECT id FROM subjects WHERE id = ? AND user_id = ?',
+      'SELECT id FROM subjects WHERE id = $1 AND user_id = $2',
       [id, req.user.id]
     );
 
@@ -221,12 +221,12 @@ router.get('/:id/stats', auth, validateId, async (req, res) => {
     // Get weekly progress for the last 4 weeks
     const weeklyProgress = await query(
       `SELECT 
-        strftime('%Y-%W', p.date) as week,
+        TO_CHAR(p.date, 'IYYY-IW') as week,
         SUM(p.hours_studied) as hours_studied,
         COUNT(DISTINCT p.date) as days_studied
        FROM progress p
-       WHERE p.subject_id = ? AND p.date >= date('now', '-28 days')
-       GROUP BY strftime('%Y-%W', p.date)
+       WHERE p.subject_id = $1 AND p.date >= NOW() - INTERVAL '28 days'
+       GROUP BY TO_CHAR(p.date, 'IYYY-IW')
        ORDER BY week DESC`,
       [id]
     );
@@ -236,7 +236,7 @@ router.get('/:id/stats', auth, validateId, async (req, res) => {
       `SELECT t.*, s.name as subject_name
        FROM todos t
        LEFT JOIN subjects s ON t.subject_id = s.id
-       WHERE t.subject_id = ?
+       WHERE t.subject_id = $1
        ORDER BY t.created_at DESC
        LIMIT 5`,
       [id]
@@ -247,7 +247,7 @@ router.get('/:id/stats', auth, validateId, async (req, res) => {
       `SELECT g.*, s.name as subject_name
        FROM goals g
        LEFT JOIN subjects s ON g.subject_id = s.id
-       WHERE g.subject_id = ?
+       WHERE g.subject_id = $1
        ORDER BY g.created_at DESC
        LIMIT 5`,
       [id]

@@ -43,7 +43,7 @@ router.post('/register', validateRegistration, async (req, res) => {
 
     // Check if user already exists
     const existingUser = await get(
-      'SELECT id FROM users WHERE email = ?',
+      'SELECT id FROM users WHERE email = $1',
       [email]
     );
 
@@ -57,13 +57,13 @@ router.post('/register', validateRegistration, async (req, res) => {
 
     // Create user
     const result = await execute(
-      'INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
+      'INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id',
       [name, email, passwordHash]
     );
 
     // Get the created user
     const user = await get(
-      'SELECT id, name, email, created_at, profile_image FROM users WHERE id = ?',
+      'SELECT id, name, email, created_at, profile_image FROM users WHERE id = $1',
       [result.id]
     );
 
@@ -101,7 +101,7 @@ router.post('/login', validateLogin, async (req, res) => {
 
     // Find user by email
     const user = await get(
-      'SELECT id, name, email, password, created_at, profile_image FROM users WHERE email = ?',
+      'SELECT id, name, email, password, created_at, profile_image FROM users WHERE email = $1',
       [email]
     );
 
@@ -146,7 +146,7 @@ router.post('/login', validateLogin, async (req, res) => {
 router.get('/me', auth, async (req, res) => {
   try {
     const user = await get(
-      'SELECT id, name, email, created_at, profile_image FROM users WHERE id = ?',
+      'SELECT id, name, email, created_at, profile_image FROM users WHERE id = $1',
       [req.user.id]
     );
 
@@ -169,7 +169,7 @@ router.put('/me', auth, async (req, res) => {
     // Check if email is already taken by another user
     if (email) {
       const existingUser = await get(
-        'SELECT id FROM users WHERE email = ? AND id != ?',
+        'SELECT id FROM users WHERE email = $1 AND id != $2',
         [email, req.user.id]
       );
 
@@ -180,13 +180,13 @@ router.put('/me', auth, async (req, res) => {
 
     // Update user
     await execute(
-      'UPDATE users SET name = ?, email = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      'UPDATE users SET name = $1, email = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
       [name || req.user.name, email || req.user.email, req.user.id]
     );
 
     // Get updated user
     const user = await get(
-      'SELECT id, name, email, created_at, profile_image FROM users WHERE id = ?',
+      'SELECT id, name, email, created_at, profile_image FROM users WHERE id = $1',
       [req.user.id]
     );
 
@@ -207,7 +207,7 @@ router.put('/change-password', auth, async (req, res) => {
 
     // Get current user with password
     const user = await get(
-      'SELECT password FROM users WHERE id = ?',
+      'SELECT password FROM users WHERE id = $1',
       [req.user.id]
     );
 
@@ -223,7 +223,7 @@ router.put('/change-password', auth, async (req, res) => {
 
     // Update password
     await execute(
-      'UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      'UPDATE users SET password = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
       [newPasswordHash, req.user.id]
     );
 
@@ -241,7 +241,7 @@ router.delete('/me', auth, async (req, res) => {
 
     // Get current user with password
     const user = await get(
-      'SELECT password FROM users WHERE id = ?',
+      'SELECT password FROM users WHERE id = $1',
       [req.user.id]
     );
 
@@ -252,7 +252,7 @@ router.delete('/me', auth, async (req, res) => {
     }
 
     // Delete user (cascade will handle related data)
-    await execute('DELETE FROM users WHERE id = ?', [req.user.id]);
+  await execute('DELETE FROM users WHERE id = $1', [req.user.id]);
 
     res.json({ message: 'Account deleted successfully' });
   } catch (error) {
@@ -265,7 +265,7 @@ router.delete('/me', auth, async (req, res) => {
 router.post('/me/profile-image', auth, upload.single('image'), async (req, res) => {
   try {
     // Delete previous image if exists
-    const existing = await get('SELECT profile_image FROM users WHERE id = ?', [req.user.id]);
+  const existing = await get('SELECT profile_image FROM users WHERE id = $1', [req.user.id]);
     if (existing?.profile_image) {
       const oldPath = path.join(__dirname, '..', existing.profile_image);
       if (fs.existsSync(oldPath)) fs.unlink(oldPath, () => {});
@@ -273,8 +273,8 @@ router.post('/me/profile-image', auth, upload.single('image'), async (req, res) 
 
   let relativePath = path.join('uploads', 'profiles', path.basename(req.file.path));
   relativePath = relativePath.replace(/\\/g, '/');
-    await execute('UPDATE users SET profile_image = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [relativePath, req.user.id]);
-    const updated = await get('SELECT id, name, email, created_at, profile_image FROM users WHERE id = ?', [req.user.id]);
+  await execute('UPDATE users SET profile_image = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [relativePath, req.user.id]);
+  const updated = await get('SELECT id, name, email, created_at, profile_image FROM users WHERE id = $1', [req.user.id]);
     res.json({ message: 'Profile image updated', user: updated });
   } catch (error) {
     logger.error('Profile image upload error:', error);
@@ -285,13 +285,13 @@ router.post('/me/profile-image', auth, upload.single('image'), async (req, res) 
 // Delete profile image
 router.delete('/me/profile-image', auth, async (req, res) => {
   try {
-    const existing = await get('SELECT profile_image FROM users WHERE id = ?', [req.user.id]);
+  const existing = await get('SELECT profile_image FROM users WHERE id = $1', [req.user.id]);
     if (existing?.profile_image) {
       const imgPath = path.join(__dirname, '..', existing.profile_image);
       if (fs.existsSync(imgPath)) fs.unlink(imgPath, () => {});
-      await execute('UPDATE users SET profile_image = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [req.user.id]);
+  await execute('UPDATE users SET profile_image = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $1', [req.user.id]);
     }
-    const updated = await get('SELECT id, name, email, created_at, profile_image FROM users WHERE id = ?', [req.user.id]);
+  const updated = await get('SELECT id, name, email, created_at, profile_image FROM users WHERE id = $1', [req.user.id]);
     res.json({ message: 'Profile image removed', user: updated });
   } catch (error) {
     logger.error('Profile image delete error:', error);
